@@ -81,16 +81,6 @@ export const useGameEngine = () => {
 
   const clearToast = () => setToastMessage(null);
 
-  const panCamera = useCallback((delta: Vector2) => {
-    setGameState(prev => ({
-      ...prev,
-      camera: {
-        x: Math.max(0, Math.min(GAME_WORLD_SIZE.width, prev.camera.x + delta.x)),
-        y: Math.max(0, Math.min(GAME_WORLD_SIZE.height, prev.camera.y + delta.y)),
-      }
-    }));
-  }, []);
-
   const gameLoop = useCallback((time: number) => {
     const deltaTime = (time - lastTimeRef.current) / 1000;
     lastTimeRef.current = time;
@@ -393,5 +383,5 @@ export const useGameEngine = () => {
   };
 
 
-  return { gameState, setTargetPosition, buyUpgrade, panCamera, resetSave, toastMessage, clearToast };
+  return { gameState, setTargetPosition, buyUpgrade, resetSave, toastMessage, clearToast };
 };

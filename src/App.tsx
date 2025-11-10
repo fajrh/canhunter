@@ -20,7 +20,6 @@ export default function App() {
     gameState,
     setTargetPosition,
     buyUpgrade,
-    panCamera,
     resetSave,
     toastMessage,
     clearToast,
