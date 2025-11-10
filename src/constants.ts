@@ -1,4 +1,3 @@
-
 // constants.ts
 import type { Zone, Upgrade, UpgradeId, Quest, PlayerState, House, WaterBody, Bridge, Landmark, Vector2 } from './types';
 
@@ -28,7 +27,7 @@ export const COLLECTIBLE_LIFESPAN = 10 * 60 * 1000; // 10 minutes
 export const COLLECTIBLE_VALUE = 0.10; // $0.10
 
 // --- World Objects ---
-export const HOME_POSITION: Vector2 = { x: 2000, y: 5500 };
+export const HOME_POSITION: Vector2 = { x: 1800, y: 3700 };
 export const KIOSK_POSITION: Vector2 = { x: 2000, y: 3000 };
 export const KIOSK_INTERACTION_RADIUS = 150;
 
@@ -112,16 +111,84 @@ export const HOUSES: House[] = [
 
 
 export const BRIDGES: Bridge[] = [
-    { name: 'Corktown Footbridge', from: {x: 1350, y: 2400}, to: {x: 1650, y: 2400}, rect: [1350, 2380, 300, 40] },
-    { name: 'Pretoria Bridge', from: {x: 1350, y: 3800}, to: {x: 1650, y: 3800}, rect: [1350, 3780, 300, 40] },
-    { name: 'Bank St Bridge', from: {x: 1350, y: 4500}, to: {x: 1650, y: 4500}, rect: [1350, 4480, 300, 40] },
+  // Rideau Canal (you already had these three)
+  { name: 'Corktown Footbridge',  from: {x:1350,y:2400}, to:{x:1650,y:2400}, rect:[1350,2380,300,40] },
+  { name: 'Pretoria Bridge',      from: {x:1350,y:3800}, to:{x:1650,y:3800}, rect:[1350,3780,300,40] },
+  { name: 'Bank St Bridge',       from: {x:1350,y:4500}, to:{x:1650,y:4500}, rect:[1350,4480,300,40] },
+
+  // Ottawa River crossings (west→east across your top band y≈1000)
+  { name: 'Chaudière Crossing',   from:{x:1100,y:1150}, to:{x:1300,y:1150}, rect:[1100,1130,200,40] }, // near Chaudière Falls
+  { name: 'Portage Bridge',       from:{x:1400,y:1100}, to:{x:1600,y:1100}, rect:[1400,1080,200,40] },
+  { name: 'Alexandra Bridge',     from:{x:2200,y:1000}, to:{x:2400,y:1000}, rect:[2200, 980,200,40] },
+  { name: 'Macdonald–Cartier',    from:{x:2900,y:1000}, to:{x:3100,y:1000}, rect:[2900, 980,200,40] },
+
+  // Other notable crossings
+  { name: 'Chief William Commanda (Prince of Wales) Bridge', from:{x:1200,y:1050}, to:{x:1350,y:1050}, rect:[1200,1030,150,40] },
+
+  // Rideau River footbridges (east side)
+  { name: 'Adawe Crossing',       from:{x:2800,y:2700}, to:{x:3000,y:2700}, rect:[2800,2680,200,40] }
 ];
 
 export const LANDMARKS: Landmark[] = [
-    { name: 'Parliament Hill', position: { x: 1800, y: 2000 }, emoji: '🏛️' },
-    { name: 'National Gallery', position: { x: 2300, y: 1800 }, emoji: '🖼️' },
-    { name: 'ByWard Market', position: { x: 2600, y: 2200 }, emoji: '🛍️' },
-    { name: 'Lansdowne Park', position: { x: 1800, y: 4200 }, emoji: '🏟️' },
+  // Parliament / downtown core
+  { name:'Parliament Hill',        position:{ x:1800, y:2000 }, emoji:'🏛️' },
+  { name:'Peace Tower',            position:{ x:1820, y:1980 }, emoji:'🕰️' },
+  { name:'Supreme Court of Canada',position:{ x:1600, y:2050 }, emoji:'⚖️' },
+  { name:'National Arts Centre',   position:{ x:1900, y:2300 }, emoji:'🎭' },
+  { name:'Rideau Centre',          position:{ x:2250, y:2150 }, emoji:'🛍️' },
+  { name:'Shaw Centre',            position:{ x:2300, y:2200 }, emoji:'🏢' },
+  { name:'Fairmont Château Laurier',position:{ x:2150, y:2100 }, emoji:'🏰' },
+  { name:'Confederation Park',     position:{ x:2000, y:2300 }, emoji:'🌳' },
+  { name:'Ottawa City Hall',       position:{ x:1950, y:2550 }, emoji:'🏛️' },
+
+  // ByWard/Sussex
+  { name:'ByWard Market',          position:{ x:2600, y:2200 }, emoji:'🥖' },
+  { name:'Notre-Dame Cathedral',   position:{ x:2350, y:1950 }, emoji:'⛪' },
+  { name:'Royal Canadian Mint',    position:{ x:2400, y:1900 }, emoji:'🪙' },
+  { name:'National Gallery of Canada', position:{ x:2300, y:1800 }, emoji:'🖼️' },
+  { name:'Rideau Falls',           position:{ x:3050, y:1050 }, emoji:'💧' },
+
+  // West side / LeBreton / Tunney’s
+  { name:'Canadian War Museum',    position:{ x:1400, y:2050 }, emoji:'🪖' },
+  { name:'LeBreton Flats',         position:{ x:1350, y:2150 }, emoji:'🌾' },
+  { name:'Pimisi Station',         position:{ x:1300, y:2350 }, emoji:'🚉' },
+  { name:'Bayview Station',        position:{ x:1100, y:2550 }, emoji:'🚉' },
+  { name:'Tunney’s Pasture',       position:{ x: 800, y:2500 }, emoji:'🏢' },
+
+  // Glebe / Lansdowne / Little Italy / Canal mid-section
+  { name:'Lansdowne Park (TD Place)', position:{ x:1800, y:4200 }, emoji:'🏟️' },
+  { name:'The Glebe',              position:{ x:1850, y:3800 }, emoji:'🏘️' },
+  { name:'Little Italy (Preston)', position:{ x:1450, y:4100 }, emoji:'🍝' },
+  { name:'Chinatown (Somerset)',   position:{ x:1200, y:3000 }, emoji:'🏮' },
+
+  // Dow’s Lake / Arboretum / Experimental Farm
+  { name:'Dow’s Lake',             position:{ x:1500, y:4600 }, emoji:'🛶' },
+  { name:'Commissioners Park',     position:{ x:1550, y:4450 }, emoji:'🌷' },
+  { name:'Dominion Arboretum',     position:{ x:1300, y:4700 }, emoji:'🌳' },
+  { name:'Central Experimental Farm', position:{ x:1000, y:4800 }, emoji:'🌾' },
+
+  // Universities
+  { name:'University of Ottawa',   position:{ x:2350, y:2450 }, emoji:'🎓' },
+  { name:'Carleton University',    position:{ x:1550, y:5200 }, emoji:'🎓' },
+
+  // South/Water features
+  { name:'Mooney’s Bay',           position:{ x:1600, y:5600 }, emoji:'🏖️' },
+  { name:'Hog’s Back Falls',       position:{ x:1500, y:5700 }, emoji:'🌊' },
+  { name:'Vincent Massey Park',    position:{ x:1750, y:5450 }, emoji:'🌲' },
+
+  // O-Train Line 1 (east)
+  { name:'Hurdman Station',        position:{ x:2600, y:3200 }, emoji:'🚉' },
+  { name:'Tremblay (Train Station)', position:{ x:2950, y:3300 }, emoji:'🚉' },
+  { name:'St. Laurent Centre',     position:{ x:3300, y:3200 }, emoji:'🛍️' },
+
+  // Rockcliffe / Aviation
+  { name:'Rockcliffe Park',        position:{ x:3200, y:1700 }, emoji:'🌲' },
+  { name:'Rideau Hall',            position:{ x:3000, y:1800 }, emoji:'🏡' },
+  { name:'Canada Aviation & Space Museum', position:{ x:3500, y:1850 }, emoji:'🛩️' },
+
+  // Across the river (still visible from Ottawa core)
+  { name:'Canadian Museum of History (Gatineau)', position:{ x:2350, y:1150 }, emoji:'🏛️' },
+  { name:'Chaudière Falls',        position:{ x:1200, y:1900 }, emoji:'💦' }
 ];
 
 // --- Upgrades ---

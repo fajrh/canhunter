@@ -43,10 +43,9 @@ export default function App() {
     <GameCanvas
       gameState={gameState}
       onSetTargetPosition={setTargetPosition}
-      onPan={panCamera}
       isInventoryFull={isInventoryFull}
     />
-  ), [gameState, setTargetPosition, panCamera, isInventoryFull]);
+  ), [gameState, setTargetPosition, isInventoryFull]);
 
   return (
     <div className="w-full h-full bg-gray-800 text-white font-sans select-none touch-callout-none">

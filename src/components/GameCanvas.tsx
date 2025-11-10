@@ -1,22 +1,19 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import type { GameState, Collectible, Vector2 } from '../types';
-import { PAN_DRAG_THRESHOLD, GAME_WORLD_SIZE, CAN_IMAGE_URLS } from '../constants';
+import { GAME_WORLD_SIZE, CAN_IMAGE_URLS } from '../constants';
 import { WaterFX } from '../services/waterfx';
 
 interface GameCanvasProps {
   gameState: GameState;
   onSetTargetPosition: (position: Vector2) => void;
-  onPan: (delta: Vector2) => void;
   isInventoryFull: boolean;
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onSetTargetPosition, onPan, isInventoryFull }) => {
+const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onSetTargetPosition, isInventoryFull }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
-  const isDraggingRef = useRef(false);
-  const dragStartRef = useRef<Vector2>({ x: 0, y: 0 });
-  const lastPanPointRef = useRef<Vector2>({x: 0, y: 0});
+  const isPointerDownRef = useRef(false);
   const waterFxRef = useRef<WaterFX | null>(null);
   const animationFrameRef = useRef(0);
   
@@ -80,40 +77,26 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onSetTargetPosition,
   }, []);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    isDraggingRef.current = false;
-    dragStartRef.current = { x: e.clientX, y: e.clientY };
-    lastPanPointRef.current = { x: e.clientX, y: e.clientY };
+    e.preventDefault();
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    isPointerDownRef.current = true;
+    const targetPos = screenToWorld({ x: e.clientX, y: e.clientY }, gameState.camera, canvasSize);
+    onSetTargetPosition(targetPos);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.buttons !== 1) return;
-    const currentPos = { x: e.clientX, y: e.clientY };
-    const dist = Math.sqrt(
-      Math.pow(currentPos.x - dragStartRef.current.x, 2) +
-      Math.pow(currentPos.y - dragStartRef.current.y, 2)
-    );
-    if (dist > PAN_DRAG_THRESHOLD) {
-      isDraggingRef.current = true;
-    }
-
-    if (isDraggingRef.current) {
-      const delta = {
-        x: lastPanPointRef.current.x - currentPos.x,
-        y: lastPanPointRef.current.y - currentPos.y
-      };
-      onPan(delta);
-      lastPanPointRef.current = currentPos;
-    }
+    e.preventDefault();
+    if (!isPointerDownRef.current) return;
+    const targetPos = screenToWorld({ x: e.clientX, y: e.clientY }, gameState.camera, canvasSize);
+    onSetTargetPosition(targetPos);
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (isDraggingRef.current) {
-      isDraggingRef.current = false;
-      return;
-    }
-    const clickPos = screenToWorld({ x: e.clientX, y: e.clientY }, gameState.camera, canvasSize);
-    onSetTargetPosition(clickPos);
+  const handlePointerUpOrLeave = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isPointerDownRef.current) return;
+    (e.target as HTMLCanvasElement).releasePointerCapture(e.pointerId);
+    isPointerDownRef.current = false;
   };
+
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -390,7 +373,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onSetTargetPosition,
     return () => {
       cancelAnimationFrame(animationFrameRef.current);
     }
-  }, [gameState, canvasSize, onPan, onSetTargetPosition, isInventoryFull, loadedImages, isGameReady, loadingProgress]);
+  }, [gameState, canvasSize, onSetTargetPosition, isInventoryFull, loadedImages, isGameReady, loadingProgress]);
 
   return (
     <canvas
@@ -400,8 +383,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onSetTargetPosition,
       className="absolute top-0 left-0 w-full h-full"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
+      onPointerUp={handlePointerUpOrLeave}
+      onPointerLeave={handlePointerUpOrLeave}
+      onPointerCancel={handlePointerUpOrLeave}
     />
   );
 };
