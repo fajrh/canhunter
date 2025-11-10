@@ -1,9 +1,13 @@
+
 {
   "name": "can-hunter-ottawa",
   "version": "1.0.0",
   "description": "A mobile-first HTML5 game where you wander Ottawa collecting cans and bottles for cash.",
   "main": "server.js",
+  "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
     "start": "node server.js"
   },
   "engines": {
@@ -11,6 +15,13 @@
   },
   "dependencies": {
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.13"
   },
   "author": "",
   "license": "ISC"
