@@ -25,7 +25,7 @@ export interface Collectible {
   imageUrl?: string;
 }
 
-export type UpgradeId = 'bag' | 'cart' | 'bell' | 'otrain' | 'map' | 'vest';
+export type UpgradeId = 'bag' | 'cart' | 'bell' | 'otrain' | 'map' | 'vest' | 'bicycle';
 
 export interface Upgrade {
   id: UpgradeId;

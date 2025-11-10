@@ -22,35 +22,35 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onSetTargetPosition,
   const [isGameReady, setIsGameReady] = useState(false);
 
   useEffect(() => {
+    const imagesToLoad = [...CAN_IMAGE_URLS];
     let loadedCount = 0;
     
-    if (CAN_IMAGE_URLS.length === 0) {
+    if (imagesToLoad.length === 0) {
         setIsGameReady(true);
         return;
     }
 
-    CAN_IMAGE_URLS.forEach(url => {
+    const handleImageLoad = (url: string, img: HTMLImageElement) => {
+        loadedCount++;
+        setLoadedImages(prev => ({ ...prev, [url]: img }));
+        setLoadingProgress({ loaded: loadedCount, total: imagesToLoad.length });
+        if (loadedCount === imagesToLoad.length) {
+            setIsGameReady(true);
+        }
+    };
+
+    imagesToLoad.forEach(url => {
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.src = url;
-        img.onload = () => {
-            loadedCount++;
-            setLoadedImages(prev => ({ ...prev, [url]: img }));
-            setLoadingProgress({ loaded: loadedCount, total: CAN_IMAGE_URLS.length });
-            if (!isGameReady) {
-                setIsGameReady(true);
-            }
-        };
+        img.onload = () => handleImageLoad(url, img);
         img.onerror = () => {
             console.error(`Failed to load image: ${url}`);
-            loadedCount++; 
-            setLoadingProgress({ loaded: loadedCount, total: CAN_IMAGE_URLS.length });
-             if (!isGameReady) {
-                setIsGameReady(true);
-            }
+            // Still count it as "loaded" to not block the game
+            handleImageLoad(url, img);
         };
     });
-  }, [isGameReady]);
+  }, []);
 
   if (!waterFxRef.current) {
     waterFxRef.current = new WaterFX(208 /*hue*/, true);

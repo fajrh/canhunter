@@ -1,3 +1,4 @@
+
 // constants.ts
 import type { Zone, Upgrade, UpgradeId, Quest, PlayerState, House, WaterBody, Bridge, Landmark, Vector2 } from './types';
 
@@ -212,10 +213,18 @@ export const UPGRADES: Record<UpgradeId, Upgrade> = {
   bell: {
     id: 'bell',
     name: 'Running Shoes',
-    description: 'Increases your movement speed by 25%.',
-    cost: 75,
+    description: 'Increases your movement speed by 50%.',
+    cost: 37.5,
     emoji: '👟',
-    apply: (s: PlayerState) => ({ speed: s.speed * 1.25 }),
+    apply: (s: PlayerState) => ({ speed: s.speed * 1.5 }),
+  },
+  bicycle: {
+    id: 'bicycle',
+    name: 'Bicycle',
+    description: 'Doubles your movement speed.',
+    cost: 250,
+    emoji: '🚲',
+    apply: (s: PlayerState) => ({ speed: s.speed * 2 }),
   },
   otrain: {
     id: 'otrain',
