@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import GameCanvas from './components/GameCanvas';
 import Hud from './components/Hud';
 import Controls from './components/Controls';

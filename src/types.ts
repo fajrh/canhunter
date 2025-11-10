@@ -84,6 +84,26 @@ export interface FlyingCan {
   emoji?: string;
 }
 
+export interface Foliage {
+    type: 'tree' | 'bush';
+    position: Vector2;
+    emoji: string;
+    variant: number;
+}
+
+export interface FloatingText {
+    id: number;
+    text: string;
+    position: Vector2;
+    life: number; // starts at 1, goes to 0
+    color: string;
+}
+
+export interface ClickMarker {
+    id: number;
+    position: Vector2;
+    life: number; // starts at 1, goes to 0
+}
 
 export interface GameState {
   player: PlayerState;
@@ -101,4 +121,7 @@ export interface GameState {
   lastSellTime: number;
   flyingCans: FlyingCan[];
   flyingCanIdCounter: number;
+  foliage: Foliage[];
+  floatingTexts: FloatingText[];
+  clickMarkers: ClickMarker[];
 }

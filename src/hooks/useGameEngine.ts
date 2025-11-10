@@ -2,9 +2,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { GameState, PlayerState, Collectible, Vector2, UpgradeId, Quest, Zone, House, WaterBody, Bridge } from '../types';
 import {
-  GAME_WORLD_SIZE, KIOSK_POSITION, KIOSK_INTERACTION_RADIUS, PLAYER_BASE_SPEED, BASE_INVENTORY_CAP,
+  KIOSK_POSITION, KIOSK_INTERACTION_RADIUS, PLAYER_BASE_SPEED, BASE_INVENTORY_CAP,
   PLAYER_RADIUS, COLLECTIBLE_RADIUS, COLLECTIBLE_LIFESPAN, COLLECTIBLE_VALUE, ZONES, UPGRADES, QUESTS,
-  HOME_POSITION, HOUSES, WATER_BODIES, BRIDGES, LANDMARKS, CAN_IMAGE_URLS,
+  HOME_POSITION, HOUSES, WATER_BODIES, BRIDGES, LANDMARKS, CAN_IMAGE_URLS, FOLIAGE, MAX_COLLECTIBLES,
 } from '../constants';
 import { audioService } from '../services/audioService';
 import { saveService } from '../services/saveService';
@@ -61,18 +61,22 @@ export const useGameEngine = () => {
       waterBodies: WATER_BODIES,
       bridges: BRIDGES,
       landmarks: LANDMARKS,
+      foliage: FOLIAGE,
       camera: { ...playerState.position },
       gameTime: saved?.gameTime || 0,
       activeQuest: saved?.activeQuest || { ...QUESTS[0], progress: 0 },
       lastSellTime: saved?.lastSellTime || 0,
       flyingCans: [],
       flyingCanIdCounter: 0,
+      floatingTexts: [],
+      clickMarkers: [],
     };
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const lastTimeRef = useRef<number>(performance.now());
   const gameLoopRef = useRef<number | null>(null);
   const collectibleIdCounter = useRef(Math.max(0, ...gameState.collectibles.map(c => c.id)) + 1);
+  const effectIdCounter = useRef(0);
 
   const setToast = (message: string, duration: number = 3000) => {
     setToastMessage(message);
@@ -110,50 +114,30 @@ export const useGameEngine = () => {
       newState.camera.x += camDx * 0.3;
       newState.camera.y += camDy * 0.3;
 
-      // Spawner logic
-      if (Math.random() < 0.21) {
-          const zone = ZONES[Math.floor(Math.random() * ZONES.length)];
-          if (Math.random() < zone.spawnMultiplier * 0.15) {
-              const [zx, zy, zw, zh] = zone.rect;
-              const position = { x: zx + Math.random() * zw, y: zy + Math.random() * zh };
-              if (!isPointInWater(position, newState.waterBodies)) {
-                const type = Math.random() < 0.7 ? 'can' : 'bottle';
-                const imageUrl = CAN_IMAGE_URLS[Math.floor(Math.random() * CAN_IMAGE_URLS.length)];
-
-                newState.collectibles.push({
-                    id: collectibleIdCounter.current++,
-                    type,
-                    emoji: '🥫',
-                    position,
-                    spawnTime: newState.gameTime,
-                    imageUrl,
-                });
-              }
-          }
-      }
-
-      // Spawn recycling bins near houses
-      if (Math.random() < 0.005) {
-          const house = HOUSES[Math.floor(Math.random() * HOUSES.length)];
-          const isBinAlreadyThere = newState.collectibles.some(c =>
-              c.type === 'bin' &&
-              Math.sqrt(Math.pow(c.position.x - house.position.x, 2) + Math.pow(c.position.y - house.position.y, 2)) < 100
-          );
-          if (!isBinAlreadyThere) {
-              const position = {
-                  x: house.position.x + (Math.random() - 0.5) * 60 + 30,
-                  y: house.position.y + (Math.random() - 0.5) * 60 + 30,
-              };
-              if (!isPointInWater(position, newState.waterBodies)) {
-                newState.collectibles.push({
-                    id: collectibleIdCounter.current++,
-                    type: 'bin',
-                    emoji: '♻️',
-                    position,
-                    spawnTime: newState.gameTime,
-                });
-              }
-          }
+      // Spawner logic (with cap)
+      if (newState.collectibles.length < MAX_COLLECTIBLES) {
+        if (Math.random() < 0.21) {
+            const zone = ZONES[Math.floor(Math.random() * ZONES.length)];
+            if (Math.random() < zone.spawnMultiplier * 0.15) {
+                const [zx, zy, zw, zh] = zone.rect;
+                const position = { x: zx + Math.random() * zw, y: zy + Math.random() * zh };
+                if (!isPointInWater(position, newState.waterBodies)) {
+                  const type = Math.random() < 0.7 ? 'can' : 'bottle';
+                  const imageUrl = CAN_IMAGE_URLS[Math.floor(Math.random() * CAN_IMAGE_URLS.length)];
+                  newState.collectibles.push({ id: collectibleIdCounter.current++, type, emoji: '🥫', position, spawnTime: newState.gameTime, imageUrl });
+                }
+            }
+        }
+        if (Math.random() < 0.005) {
+            const house = HOUSES[Math.floor(Math.random() * HOUSES.length)];
+            const isBinAlreadyThere = newState.collectibles.some(c => c.type === 'bin' && Math.hypot(c.position.x - house.position.x, c.position.y - house.position.y) < 100);
+            if (!isBinAlreadyThere) {
+                const position = { x: house.position.x + (Math.random() - 0.5) * 60 + 30, y: house.position.y + (Math.random() - 0.5) * 60 + 30 };
+                if (!isPointInWater(position, newState.waterBodies)) {
+                  newState.collectibles.push({ id: collectibleIdCounter.current++, type: 'bin', emoji: '♻️', position, spawnTime: newState.gameTime });
+                }
+            }
+        }
       }
 
       // O-train card special spawn
@@ -162,17 +146,10 @@ export const useGameEngine = () => {
         const [zx, zy, zw, zh] = zone.rect;
         for (let i = 0; i < 5 + Math.floor(Math.random() * 5); i++) {
            const position = { x: zx + Math.random() * zw, y: zy + Math.random() * zh };
-           if (!isPointInWater(position, newState.waterBodies)) {
+           if (!isPointInWater(position, newState.waterBodies) && newState.collectibles.length < MAX_COLLECTIBLES) {
                 const type = Math.random() < 0.7 ? 'can' : 'bottle';
                 const imageUrl = CAN_IMAGE_URLS[Math.floor(Math.random() * CAN_IMAGE_URLS.length)];
-                newState.collectibles.push({ 
-                    id: collectibleIdCounter.current++, 
-                    type, 
-                    emoji: '🥫', 
-                    position, 
-                    spawnTime: newState.gameTime,
-                    imageUrl,
-                });
+                newState.collectibles.push({ id: collectibleIdCounter.current++, type, emoji: '🥫', position, spawnTime: newState.gameTime, imageUrl });
            }
         }
         setToast("O-Train Pass triggered a multi-spawn!", 3000);
@@ -184,19 +161,17 @@ export const useGameEngine = () => {
       const collectedToday: {collectible: Collectible, zone: Zone | undefined}[] = [];
       const binsToExplode: Collectible[] = [];
       const remainingCollectibles = newState.collectibles.filter(c => {
-        const dx = c.position.x - player.position.x;
-        const dy = c.position.y - player.position.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const distance = Math.hypot(c.position.x - player.position.x, c.position.y - player.position.y);
 
         if (distance < PLAYER_RADIUS + COLLECTIBLE_RADIUS) {
           if (c.type === 'bin') {
             binsToExplode.push(c);
-            return false; // Remove bin
+            return false;
           }
           if (player.inventory.length < player.inventoryCap) {
             const zone = ZONES.find(z => isPointInRect(c.position, z.rect));
             collectedToday.push({collectible: c, zone});
-            return false; // Remove can/bottle
+            return false;
           }
         }
         return newState.gameTime - c.spawnTime < COLLECTIBLE_LIFESPAN;
@@ -207,21 +182,12 @@ export const useGameEngine = () => {
             audioService.playPickupSound();
             const numToSpawn = 3 + Math.floor(Math.random() * 3);
             for (let i = 0; i < numToSpawn; i++) {
-                const position = {
-                    x: bin.position.x + (Math.random() - 0.5) * 50,
-                    y: bin.position.y + (Math.random() - 0.5) * 50,
-                };
+                if (newState.collectibles.length >= MAX_COLLECTIBLES) break;
+                const position = { x: bin.position.x + (Math.random() - 0.5) * 50, y: bin.position.y + (Math.random() - 0.5) * 50 };
                 if (!isPointInWater(position, newState.waterBodies)) {
                     const type = Math.random() < 0.7 ? 'can' : 'bottle';
                     const imageUrl = CAN_IMAGE_URLS[Math.floor(Math.random() * CAN_IMAGE_URLS.length)];
-                    remainingCollectibles.push({
-                        id: collectibleIdCounter.current++,
-                        type,
-                        emoji: '🥫',
-                        position,
-                        spawnTime: newState.gameTime,
-                        imageUrl,
-                    });
+                    remainingCollectibles.push({ id: collectibleIdCounter.current++, type, emoji: '🥫', position, spawnTime: newState.gameTime, imageUrl });
                 }
             }
         });
@@ -234,6 +200,14 @@ export const useGameEngine = () => {
         player.inventory.push(...collectedToday.map(c => c.collectible));
         if (typeof navigator.vibrate === 'function') navigator.vibrate(50);
         audioService.playPickupSound();
+        
+        newState.floatingTexts.push({
+            id: effectIdCounter.current++,
+            text: `+${(collectedToday.length * COLLECTIBLE_VALUE * 100).toFixed(0)}¢`,
+            position: {...player.position},
+            life: 1.0,
+            color: '#39FF14'
+        });
 
         if (newState.activeQuest) {
             let progressIncrement = 0;
@@ -256,36 +230,29 @@ export const useGameEngine = () => {
       }
       newState.collectibles = remainingCollectibles;
 
-      const distToKiosk = Math.sqrt(Math.pow(player.position.x - KIOSK_POSITION.x, 2) + Math.pow(player.position.y - KIOSK_POSITION.y, 2));
-      newState.isPlayerNearKiosk = distToKiosk < KIOSK_INTERACTION_RADIUS;
+      newState.isPlayerNearKiosk = Math.hypot(player.position.x - KIOSK_POSITION.x, player.position.y - KIOSK_POSITION.y) < KIOSK_INTERACTION_RADIUS;
       
       const SELL_INTERVAL = 100; // ms
       if (newState.isPlayerNearKiosk && player.inventory.length > 0 && newState.gameTime - (newState.lastSellTime || 0) > SELL_INTERVAL) {
         const soldItem = player.inventory.pop();
-        
         if (soldItem) {
           const valuePerItem = player.upgrades.has('vest') ? COLLECTIBLE_VALUE * 1.1 : COLLECTIBLE_VALUE;
           player.money += valuePerItem;
           newState.lastSellTime = newState.gameTime;
-          
-          newState.flyingCans.push({
-            id: newState.flyingCanIdCounter++,
-            start: { ...player.position },
-            end: KIOSK_POSITION,
-            progress: 0,
-            imageUrl: soldItem.imageUrl,
-            emoji: soldItem.emoji,
-          });
-
+          newState.flyingCans.push({ id: newState.flyingCanIdCounter++, start: { ...player.position }, end: KIOSK_POSITION, progress: 0, imageUrl: soldItem.imageUrl, emoji: soldItem.emoji });
           audioService.playSingleSellPop();
         }
       }
       
-      const FLYING_CAN_SPEED = 0.8; // progress per second
-      newState.flyingCans = newState.flyingCans.map(can => ({
-          ...can,
-          progress: can.progress + FLYING_CAN_SPEED * deltaTime,
-      })).filter(can => can.progress < 1);
+      const FLYING_CAN_SPEED = 0.8;
+      newState.flyingCans = newState.flyingCans.map(can => ({ ...can, progress: can.progress + FLYING_CAN_SPEED * deltaTime })).filter(can => can.progress < 1);
+      
+      // Update UI Effects
+      const FLOATING_TEXT_SPEED = 1.2;
+      newState.floatingTexts = newState.floatingTexts.map(t => ({...t, life: t.life - FLOATING_TEXT_SPEED * deltaTime, position: {x: t.position.x, y: t.position.y - 20 * deltaTime }})).filter(t => t.life > 0);
+      
+      const CLICK_MARKER_SPEED = 4.0;
+      newState.clickMarkers = newState.clickMarkers.map(m => ({...m, life: m.life - CLICK_MARKER_SPEED * deltaTime})).filter(m => m.life > 0);
 
       return newState;
     });
@@ -316,15 +283,15 @@ export const useGameEngine = () => {
     setGameState(prev => {
       const onBridge = isPointOnBridge(position, prev.bridges);
       if (isPointInWater(position, prev.waterBodies) && !onBridge) {
-        return prev; // Invalid target, do nothing
+        return prev;
       }
+      
+      const newClickMarkers = [...prev.clickMarkers, {id: effectIdCounter.current++, position, life: 1.0}];
 
       return {
         ...prev,
-        player: {
-          ...prev.player,
-          targetPosition: { ...position }
-        }
+        player: { ...prev.player, targetPosition: { ...position } },
+        clickMarkers: newClickMarkers,
       };
     });
   }, []);
@@ -341,15 +308,7 @@ export const useGameEngine = () => {
         const newUpgrades = new Set(prev.player.upgrades);
         newUpgrades.add(upgradeId);
 
-        return {
-          ...prev,
-          player: {
-            ...prev.player,
-            ...updatedStats,
-            money: prev.player.money - upgrade.cost,
-            upgrades: newUpgrades,
-          }
-        };
+        return { ...prev, player: { ...prev.player, ...updatedStats, money: prev.player.money - upgrade.cost, upgrades: newUpgrades }};
       } else if (prev.player.upgrades.has(upgradeId)) {
           setToast(`Already purchased!`, 2000);
       } else {
@@ -372,12 +331,15 @@ export const useGameEngine = () => {
       waterBodies: WATER_BODIES,
       bridges: BRIDGES,
       landmarks: LANDMARKS,
+      foliage: FOLIAGE,
       camera: { ...initialPlayer.position },
       gameTime: 0,
       activeQuest: { ...QUESTS[0], progress: 0 },
       lastSellTime: 0,
       flyingCans: [],
       flyingCanIdCounter: 0,
+      floatingTexts: [],
+      clickMarkers: [],
     });
     setToast("Game progress has been reset.", 3000);
   };
