@@ -1,6 +1,7 @@
 
+
 import React from 'react';
-import type { Quest } from '../types';
+import type { Quest } from '../types.ts';
 
 interface HudProps {
   money: number;

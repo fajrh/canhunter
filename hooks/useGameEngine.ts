@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { GameState, PlayerState, Collectible, Vector2, UpgradeId, Quest, Zone, House, WaterBody, Bridge } from '../types';
+import type { GameState, PlayerState, Collectible, Vector2, UpgradeId, Quest, Zone, House, WaterBody, Bridge } from '../types.ts';
 import {
   GAME_WORLD_SIZE, KIOSK_POSITION, KIOSK_INTERACTION_RADIUS, PLAYER_BASE_SPEED, BASE_INVENTORY_CAP,
   PLAYER_RADIUS, COLLECTIBLE_RADIUS, COLLECTIBLE_LIFESPAN, COLLECTIBLE_VALUE, ZONES, UPGRADES, QUESTS,
   HOME_POSITION, HOUSES, WATER_BODIES, BRIDGES, LANDMARKS, CAN_IMAGE_URLS,
-} from '../constants';
-import { audioService } from '../services/audioService';
-import { saveService } from '../services/saveService';
+} from '../constants.ts';
+import { audioService } from '../services/audioService.ts';
+import { saveService } from '../services/saveService.ts';
 
 // --- Geometry Utilities ---
 const isPointInPolygon = (point: Vector2, polygon: Vector2[]): boolean => {

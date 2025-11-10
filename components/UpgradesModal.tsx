@@ -1,7 +1,8 @@
 
+
 import React from 'react';
-import type { UpgradeId } from '../types';
-import { UPGRADES } from '../constants';
+import type { UpgradeId } from '../types.ts';
+import { UPGRADES } from '../constants.ts';
 
 interface UpgradesModalProps {
   playerMoney: number;

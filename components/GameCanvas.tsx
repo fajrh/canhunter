@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import type { GameState, Collectible, Vector2 } from '../types';
-import { PAN_DRAG_THRESHOLD, GAME_WORLD_SIZE, CAN_IMAGE_URLS } from '../constants';
-import { WaterFX } from '../services/waterfx';
+import type { GameState, Collectible, Vector2 } from '../types.ts';
+import { PAN_DRAG_THRESHOLD, GAME_WORLD_SIZE, CAN_IMAGE_URLS } from '../constants.ts';
+import { WaterFX } from '../services/waterfx.ts';
 
 interface GameCanvasProps {
   gameState: GameState;

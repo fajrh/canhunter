@@ -1,5 +1,6 @@
 
-import type { GameState } from '../types';
+
+import type { GameState } from '../types.ts';
 
 const SAVE_KEY = 'canHunterOttawaSave';
 

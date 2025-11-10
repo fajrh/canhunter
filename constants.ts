@@ -1,5 +1,5 @@
 // constants.ts
-import type { Zone, Upgrade, UpgradeId, Quest, PlayerState, House, WaterBody, Bridge, Landmark, Vector2 } from './types';
+import type { Zone, Upgrade, UpgradeId, Quest, PlayerState, House, WaterBody, Bridge, Landmark, Vector2 } from './types.ts';
 
 export const GAME_WORLD_SIZE = { width: 4000, height: 6000 };
 
