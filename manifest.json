@@ -1,0 +1,25 @@
+
+{
+  "short_name": "Can Hunter",
+  "name": "Can Hunter - Ottawa",
+  "description": "A mobile-first HTML5 game where you wander Ottawa collecting cans and bottles for cash.",
+  "icons": [
+    {
+      "src": "https://i.ibb.co/63XC9yZ/Chat-GPT-Image-Nov-10-2025-10-06-27-AM.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://i.ibb.co/63XC9yZ/Chat-GPT-Image-Nov-10-2025-10-06-27-AM.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/index.html",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#a1c099",
+  "background_color": "#a1c099"
+}
