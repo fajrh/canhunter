@@ -24,7 +24,7 @@ export interface Collectible {
   imageUrl?: string;
 }
 
-export type UpgradeId = 'bag' | 'cart' | 'bell' | 'otrain' | 'map' | 'vest';
+export type UpgradeId = 'bag' | 'cart' | 'bell' | 'otrain' | 'map' | 'vest' | 'bicycle';
 
 export interface Upgrade {
   id: UpgradeId;
@@ -83,6 +83,44 @@ export interface FlyingCan {
   emoji?: string;
 }
 
+export interface Foliage {
+    type: 'tree' | 'bush';
+    position: Vector2;
+    emoji: string;
+    variant: number;
+}
+
+export interface FloatingText {
+    id: number;
+    text: string;
+    position: Vector2;
+    life: number; // starts at 1, goes to 0
+    color: string;
+}
+
+export interface ClickMarker {
+    id: number;
+    position: Vector2;
+    life: number; // starts at 1, goes to 0
+}
+
+export type FrameRect = { x:number; y:number; w:number; h:number };
+export type AnimMap = Record<string, string[]>;
+export type CritterKind = 'cat' | 'pigeon';
+export type CritterState = 'IDLE' | 'WALK';
+export interface Critter {
+  id: number;
+  kind: CritterKind;
+  pos: Vector2;
+  state: CritterState;
+  dir: number;          // radians
+  speed: number;        // px/s
+  tState: number;       // seconds in current state
+  tAnim: number;        // seconds in current anim
+  anim: string;         // 'cat_idle' | 'cat_walk' etc.
+  bbox: { w:number; h:number };
+  nextGoal?: Vector2;
+}
 
 export interface GameState {
   player: PlayerState;
@@ -100,4 +138,8 @@ export interface GameState {
   lastSellTime: number;
   flyingCans: FlyingCan[];
   flyingCanIdCounter: number;
+  foliage: Foliage[];
+  floatingTexts: FloatingText[];
+  clickMarkers: ClickMarker[];
+  critters: Critter[];
 }

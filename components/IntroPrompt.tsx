@@ -39,4 +39,4 @@ const GameMessage: React.FC<GameMessageProps> = ({ text: fullText }) => {
   );
 };
 
-export default GameMessage;
+export default React.memo(GameMessage);

@@ -1,5 +1,5 @@
 // waterfx.ts
-import type { Vector2 } from "../types.ts";
+import type { Vector2 } from "../types";
 
 type Dim = { width: number; height: number };
 

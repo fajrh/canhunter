@@ -1,13 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import GameCanvas from './components/GameCanvas.tsx';
-import Hud from './components/Hud.tsx';
-import Controls from './components/Controls.tsx';
-import UpgradesModal from './components/UpgradesModal.tsx';
-import Toast from './components/Toast.tsx';
-import { useGameEngine } from './hooks/useGameEngine.ts';
-import { audioService } from './services/audioService.ts';
-import GameMessage from './components/IntroPrompt.tsx';
-import HelpModal from './components/HelpModal.tsx';
+import React, { useState, useMemo } from 'react';
+import GameCanvas from './components/GameCanvas';
+import Hud from './components/Hud';
+import Controls from './components/Controls';
+import UpgradesModal from './components/UpgradesModal';
+import Toast from './components/Toast';
+import { useGameEngine } from './hooks/useGameEngine';
+import { audioService } from './services/audioService';
+import GameMessage from './components/IntroPrompt';
+import HelpModal from './components/HelpModal';
 
 
 export default function App() {
@@ -19,7 +19,6 @@ export default function App() {
     gameState,
     setTargetPosition,
     buyUpgrade,
-    panCamera,
     resetSave,
     toastMessage,
     clearToast,
@@ -42,10 +41,9 @@ export default function App() {
     <GameCanvas
       gameState={gameState}
       onSetTargetPosition={setTargetPosition}
-      onPan={panCamera}
       isInventoryFull={isInventoryFull}
     />
-  ), [gameState, setTargetPosition, panCamera, isInventoryFull]);
+  ), [gameState, setTargetPosition, isInventoryFull]);
 
   return (
     <div className="w-full h-full bg-gray-800 text-white font-sans select-none touch-callout-none">

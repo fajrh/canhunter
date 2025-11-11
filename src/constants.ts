@@ -1,8 +1,5 @@
-
-
 // constants.ts
-// FIX: Add Quest to type imports
-import type { Zone, Upgrade, UpgradeId, PlayerState, House, WaterBody, Bridge, Landmark, Vector2, Foliage, Quest } from './types';
+import type { Zone, Upgrade, UpgradeId, PlayerState, House, WaterBody, Bridge, Landmark, Vector2, Foliage, Quest } from './types.ts';
 
 export const GAME_WORLD_SIZE = { width: 4000, height: 6000 };
 export const MAX_COLLECTIBLES = 1500;
@@ -64,16 +61,9 @@ const isPointInPolygon = (point: Vector2, polygon: Vector2[]): boolean => {
     return isInside;
 };
 
-// FIX: Define isPointInWater to be used in foliage generation.
-const isPointInWater = (point: Vector2, waterBodies: WaterBody[]): boolean => {
-    return waterBodies.some(wb => isPointInPolygon(point, wb.polygon));
+export const isPointInWater = (point: Vector2): boolean => {
+    return WATER_BODIES.some(wb => isPointInPolygon(point, wb.polygon));
 };
-
-const isPointInRect = (point: Vector2, rect: [number, number, number, number]): boolean => {
-    const [x, y, w, h] = rect;
-    return point.x >= x && point.x <= x + w && point.y >= y && point.y <= y + h;
-};
-
 
 // --- Houses ---
 const createHouseCluster = (center: Vector2, count: number, radius: number): House[] => {
@@ -82,7 +72,7 @@ const createHouseCluster = (center: Vector2, count: number, radius: number): Hou
         const angle = (i / count) * 2 * Math.PI + (Math.random() - 0.5) * 0.8;
         const distance = radius * (0.6 + Math.random() * 0.4);
         const housePos = { x: center.x + Math.cos(angle) * distance, y: center.y + Math.sin(angle) * distance };
-        if (!WATER_BODIES.some(wb => isPointInPolygon(housePos, wb.polygon))) {
+        if (!isPointInWater(housePos)) {
              houses.push({ position: housePos });
         }
     }
@@ -159,8 +149,8 @@ const isPointNearLandmark = (point: Vector2): boolean => {
 
 const generateFoliage = (): Foliage[] => {
     const foliage: Foliage[] = [];
-    const treeDensity = 0.0003; // trees per square pixel
-    const bushDensity = 0.0004; // bushes per square pixel
+    const treeDensity = 0.000015; // trees per square pixel (95% reduction)
+    const bushDensity = 0.00002; // bushes per square pixel (95% reduction)
     const totalArea = GAME_WORLD_SIZE.width * GAME_WORLD_SIZE.height;
     
     const treeCount = Math.floor(totalArea * treeDensity);
@@ -171,7 +161,7 @@ const generateFoliage = (): Foliage[] => {
             x: Math.random() * GAME_WORLD_SIZE.width,
             y: Math.random() * GAME_WORLD_SIZE.height
         };
-        if (!isPointInWater(position, WATER_BODIES) && !isPointNearLandmark(position)) {
+        if (!isPointInWater(position) && !isPointNearLandmark(position)) {
             foliage.push({ type: 'tree', position, emoji: '🌳', variant: 1 });
         }
     }
@@ -180,7 +170,7 @@ const generateFoliage = (): Foliage[] => {
             x: Math.random() * GAME_WORLD_SIZE.width,
             y: Math.random() * GAME_WORLD_SIZE.height
         };
-        if (!isPointInWater(position, WATER_BODIES) && !isPointNearLandmark(position)) {
+        if (!isPointInWater(position) && !isPointNearLandmark(position)) {
             foliage.push({ type: 'bush', position, emoji: '🌿', variant: 2 });
         }
     }
@@ -189,12 +179,43 @@ const generateFoliage = (): Foliage[] => {
 
 export const FOLIAGE = generateFoliage();
 
+// --- Critters ---
+// This would be in a JSON file but since we can't add files, it's here.
+export const CRITTER_ATLAS = {
+  "image": "https://i.ibb.co/b3h7B5S/critters-atlas.png",
+  "frames": {
+    "cat_idle_0": { "x": 0,  "y": 0,  "w": 24, "h": 24 }, "cat_idle_1": { "x": 24, "y": 0,  "w": 24, "h": 24 },
+    "cat_walk_0": { "x": 48, "y": 0,  "w": 24, "h": 24 }, "cat_walk_1": { "x": 72, "y": 0,  "w": 24, "h": 24 },
+    "cat_walk_2": { "x": 96, "y": 0,  "w": 24, "h": 24 }, "cat_walk_3": { "x": 120,"y": 0,  "w": 24, "h": 24 },
+    "pigeon_idle_0": { "x": 0,  "y": 24, "w": 24, "h": 24 }, "pigeon_idle_1": { "x": 24, "y": 24, "w": 24, "h": 24 },
+    "pigeon_walk_0": { "x": 48, "y": 24, "w": 24, "h": 24 }, "pigeon_walk_1": { "x": 72, "y": 24, "w": 24, "h": 24 },
+    "pigeon_walk_2": { "x": 96, "y": 24, "w": 24, "h": 24 }, "pigeon_walk_3": { "x": 120,"y": 24, "w": 24, "h": 24 }
+  },
+  "anims": {
+    "cat_idle":   ["cat_idle_0", "cat_idle_1"], "cat_walk":   ["cat_walk_0", "cat_walk_1", "cat_walk_2", "cat_walk_3"],
+    "pigeon_idle":["pigeon_idle_0", "pigeon_idle_1"], "pigeon_walk":["pigeon_walk_0", "pigeon_walk_1", "pigeon_walk_2", "pigeon_walk_3"]
+  }
+};
+export const CRITTER_WALK_DUR = [2.5, 4.0];
+export const CRITTER_IDLE_DUR = [1.5, 3.0];
+export const CRITTER_FPS_IDLE = 2;
+export const CRITTER_FPS_WALK = 7;
+export const CRITTER_TURN_MAX = Math.PI / 6;
+export const CRITTER_UPDATE_RATE = 5; // logic steps per second
+export const CRITTER_AVOID_WATER = true;
+export const CRITTER_SPAWNS = [
+  { kind: 'cat' as const,    pos: { x: 1850, y: 3900 } }, // Glebe
+  { kind: 'cat' as const,    pos: { x: 1750, y: 4100 } }, // Lansdowne
+  { kind: 'pigeon' as const, pos: { x: 2000, y: 2250 } }, // Confederation Park
+  { kind: 'pigeon' as const, pos: { x: 2600, y: 2200 } }, // ByWard Market
+  { kind: 'pigeon' as const, pos: { x: 1810, y: 2050 } }  // Parliament
+];
 
 // --- Upgrades ---
 export const UPGRADES: Record<UpgradeId, Upgrade> = {
   bag: { id: 'bag', name: 'Bigger Bag', description: 'Increases inventory capacity by 20.', cost: 25, emoji: '🎒', apply: (s: PlayerState) => ({ inventoryCap: s.inventoryCap + 20 }) },
   cart: { id: 'cart', name: 'Shopping Cart', description: 'Increases inventory capacity by 50.', cost: 100, emoji: '🛒', apply: (s: PlayerState) => ({ inventoryCap: s.inventoryCap + 50 }) },
-  bell: { id: 'bell', name: 'Running Shoes', description: 'Increases your movement speed by 50%.', cost: 37.5, emoji: '👟', apply: (s: PlayerState) => ({ speed: s.speed * 1.5 }) },
+  bell: { id: 'bell', name: 'Running Shoes', description: 'Increases your movement speed by 50%.', cost: 75, emoji: '👟', apply: (s: PlayerState) => ({ speed: s.speed * 1.5 }) },
   bicycle: { id: 'bicycle', name: 'Bicycle', description: 'Doubles your movement speed.', cost: 250, emoji: '🚲', apply: (s: PlayerState) => ({ speed: s.speed * 2 }) },
   otrain: { id: 'otrain', name: 'O-Train Pass', description: 'Occasionally triggers a multi-spawn of items.', cost: 500, emoji: '🚆', apply: (s: PlayerState) => s },
   map: { id: 'map', name: 'City Map', description: 'Shows a mini-map on your screen.', cost: 100, emoji: '🗺️', apply: (s: PlayerState) => s },

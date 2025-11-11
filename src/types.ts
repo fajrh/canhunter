@@ -105,6 +105,24 @@ export interface ClickMarker {
     life: number; // starts at 1, goes to 0
 }
 
+export type FrameRect = { x:number; y:number; w:number; h:number };
+export type AnimMap = Record<string, string[]>;
+export type CritterKind = 'cat' | 'pigeon';
+export type CritterState = 'IDLE' | 'WALK';
+export interface Critter {
+  id: number;
+  kind: CritterKind;
+  pos: Vector2;
+  state: CritterState;
+  dir: number;          // radians
+  speed: number;        // px/s
+  tState: number;       // seconds in current state
+  tAnim: number;        // seconds in current anim
+  anim: string;         // 'cat_idle' | 'cat_walk' etc.
+  bbox: { w:number; h:number };
+  nextGoal?: Vector2;
+}
+
 export interface GameState {
   player: PlayerState;
   collectibles: Collectible[];
@@ -124,4 +142,5 @@ export interface GameState {
   foliage: Foliage[];
   floatingTexts: FloatingText[];
   clickMarkers: ClickMarker[];
+  critters: Critter[];
 }
