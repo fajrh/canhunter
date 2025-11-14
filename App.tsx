@@ -83,6 +83,7 @@ export default function App() {
         maxHp={uiState.maxHp}
         stashCount={uiState.stashCount}
         stashCap={uiState.stashCap}
+        speedBoostTimer={uiState.speedBoostTimer}
       />
 
       <Controls

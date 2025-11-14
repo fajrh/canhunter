@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import type { GameState, Vector2, Bridge, ChatBubble } from '../types.ts';
-import { CAN_IMAGE_URLS, GAME_WORLD_SIZE, CRITTER_ATLAS, CRITTER_FPS_IDLE, CRITTER_FPS_WALK, QUEBEC_BORDER_Y } from '../constants.ts';
+import { CAN_IMAGE_URLS, GAME_WORLD_SIZE, CRITTER_ATLAS, CRITTER_FPS_IDLE, CRITTER_FPS_WALK, QUEBEC_BORDER_Y, SPEED_BOOST_DURATION } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
 
@@ -52,7 +52,10 @@ const drawChatBubble = (ctx: CanvasRenderingContext2D, bubble: ChatBubble, camer
 const GameCanvas: React.FC<GameCanvasProps> = ({ gameStateRef, onSetTargetPosition }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [devicePixelRatio, setDevicePixelRatio] = useState(window.devicePixelRatio || 1);
   const waterFxRef = useRef<WaterFX | null>(null);
+  const patternCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const groundPatternRef = useRef<CanvasPattern | null>(null);
   
   const [loadedImages, setLoadedImages] = useState<Record<string, HTMLImageElement>>({});
   const [loadingProgress, setLoadingProgress] = useState({ loaded: 0, total: 1 });
@@ -77,11 +80,75 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStateRef, onSetTargetPositi
   const worldToScreen = (pos: Vector2, camera: Vector2, canvasDim: {width: number, height: number}): Vector2 => ({ x: pos.x - camera.x + canvasDim.width / 2, y: pos.y - camera.y + canvasDim.height / 2 });
   const screenToWorld = (pos: Vector2, camera: Vector2, canvasDim: {width: number, height: number}): Vector2 => ({ x: pos.x + camera.x - canvasDim.width / 2, y: pos.y + camera.y - canvasDim.height / 2 });
 
-  useEffect(() => { const handleResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight }); window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize); }, []);
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => { e.preventDefault(); onSetTargetPosition(screenToWorld({ x: e.clientX, y: e.clientY }, gameStateRef.current.camera, canvasSize)); };
+  useEffect(() => {
+    const handleResize = () => {
+      setCanvasSize({ width: window.innerWidth, height: window.innerHeight });
+      setDevicePixelRatio(window.devicePixelRatio || 1);
+    };
+    window.addEventListener('resize', handleResize);
+    const mediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    const handleDprChange = () => setDevicePixelRatio(window.devicePixelRatio || 1);
+    if (mediaQuery.addEventListener) mediaQuery.addEventListener('change', handleDprChange);
+    else if (mediaQuery.addListener) mediaQuery.addListener(handleDprChange);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (mediaQuery.removeEventListener) mediaQuery.removeEventListener('change', handleDprChange);
+      else if (mediaQuery.removeListener) mediaQuery.removeListener(handleDprChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = devicePixelRatio;
+    canvas.width = Math.floor(canvasSize.width * dpr);
+    canvas.height = Math.floor(canvasSize.height * dpr);
+    canvas.style.width = `${canvasSize.width}px`;
+    canvas.style.height = `${canvasSize.height}px`;
+  }, [canvasSize, devicePixelRatio]);
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const x = e.clientX - (rect?.left ?? 0);
+    const y = e.clientY - (rect?.top ?? 0);
+    onSetTargetPosition(screenToWorld({ x, y }, gameStateRef.current.camera, canvasSize));
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return;
+    const ensureGroundPattern = () => {
+      if (!patternCanvasRef.current) {
+        const patternCanvas = document.createElement('canvas');
+        patternCanvas.width = patternCanvas.height = 256;
+        const pctx = patternCanvas.getContext('2d');
+        if (pctx) {
+          const gradient = pctx.createLinearGradient(0, 0, 256, 256);
+          gradient.addColorStop(0, '#a7c9a2');
+          gradient.addColorStop(1, '#8fb588');
+          pctx.fillStyle = gradient;
+          pctx.fillRect(0, 0, 256, 256);
+          pctx.fillStyle = 'rgba(255,255,255,0.05)';
+          for (let i = 0; i < 140; i++) {
+            const size = 1 + Math.random() * 3;
+            pctx.beginPath();
+            pctx.arc(Math.random() * 256, Math.random() * 256, size, 0, Math.PI * 2);
+            pctx.fill();
+          }
+          pctx.strokeStyle = 'rgba(70, 102, 70, 0.15)';
+          for (let i = 0; i < 8; i++) {
+            pctx.beginPath();
+            pctx.moveTo(Math.random() * 256, Math.random() * 256);
+            pctx.lineTo(Math.random() * 256, Math.random() * 256);
+            pctx.stroke();
+          }
+        }
+        patternCanvasRef.current = patternCanvas;
+      }
+      if (patternCanvasRef.current && !groundPatternRef.current) {
+        groundPatternRef.current = ctx.createPattern(patternCanvasRef.current, 'repeat');
+      }
+      return groundPatternRef.current;
+    };
     let animationFrameId: number;
     
     const render = (time: number) => {
@@ -90,16 +157,32 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStateRef, onSetTargetPositi
           animationFrameId = requestAnimationFrame(render);
           return;
       }
-      ctx.fillStyle = '#a1c099'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
       const { camera, player, refundDepot, stashHouse, waterBodies, bridges, landmarks, foliage, floatingTexts, clickMarkers, critters, language, traffic, npcs, crosswalks, dialogue, closestBridge } = gameState;
+      const dpr = devicePixelRatio;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+
+      const pattern = ensureGroundPattern();
+      ctx.fillStyle = pattern || '#a1c099';
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
       const CULL_MARGIN = 100;
       const viewBounds = { left: camera.x - canvasSize.width/2 - CULL_MARGIN, right: camera.x + canvasSize.width/2 + CULL_MARGIN, top: camera.y - canvasSize.height/2 - CULL_MARGIN, bottom: camera.y + canvasSize.height/2 + CULL_MARGIN };
       
+      const waterFx = waterFxRef.current!;
       waterBodies.forEach(wb => {
-          waterFxRef.current!.drawWaterBody(ctx, wb.polygon, camera, canvasSize, time)
+          waterFx.drawWaterBody(ctx, wb.polygon, camera, canvasSize, time);
       });
+
+      ctx.save();
+      const vignette = ctx.createLinearGradient(0, 0, 0, canvasSize.height);
+      vignette.addColorStop(0, 'rgba(0,0,0,0.18)');
+      vignette.addColorStop(0.3, 'rgba(0,0,0,0)');
+      vignette.addColorStop(0.7, 'rgba(0,0,0,0)');
+      vignette.addColorStop(1, 'rgba(0,0,0,0.28)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+      ctx.restore();
       
       const borderY = QUEBEC_BORDER_Y;
       if (borderY > viewBounds.top && borderY < viewBounds.bottom) {
@@ -118,6 +201,36 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStateRef, onSetTargetPositi
           ctx.fillRect(x, y, b.rect[2], b.rect[3]);
           ctx.strokeRect(x, y, b.rect[2], b.rect[3]);
       });
+
+      if (closestBridge) {
+          const [bx, by, bw, bh] = closestBridge.rect;
+          const topLeft = worldToScreen({ x: bx, y: by }, camera, canvasSize);
+          const bottomRight = worldToScreen({ x: bx + bw, y: by + bh }, camera, canvasSize);
+          const width = bottomRight.x - topLeft.x;
+          const height = bottomRight.y - topLeft.y;
+          ctx.save();
+          ctx.fillStyle = 'rgba(255, 215, 0, 0.12)';
+          ctx.fillRect(topLeft.x, topLeft.y, width, height);
+          ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([8, 6]);
+          ctx.strokeRect(topLeft.x, topLeft.y, width, height);
+          ctx.restore();
+
+          ctx.save();
+          const labelWidth = Math.min(360, canvasSize.width - 40);
+          const labelX = (canvasSize.width - labelWidth) / 2;
+          const labelY = 20;
+          ctx.fillStyle = 'rgba(12, 20, 12, 0.65)';
+          ctx.fillRect(labelX, labelY, labelWidth, 48);
+          ctx.fillStyle = '#FFE27A';
+          ctx.font = '600 16px "Segoe UI", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const bridgeName = closestBridge.nameKey ? t(closestBridge.nameKey, language) : closestBridge.name;
+          ctx.fillText(`${t('bridge_label', language)}: ${bridgeName}`, labelX + labelWidth / 2, labelY + 24);
+          ctx.restore();
+      }
 
       crosswalks.forEach(cw => { /* ... crosswalk drawing ... */ });
       
@@ -144,7 +257,27 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStateRef, onSetTargetPositi
             ctx.strokeText(text, x, y + 14); ctx.fillText(text, x, y + 14);
           }
       });
-      
+
+      const pathTargets: Vector2[] = [];
+      if (player.targetPosition) pathTargets.push(player.targetPosition);
+      if (player.pathQueue.length) pathTargets.push(...player.pathQueue);
+      if (pathTargets.length) {
+          const startPos = worldToScreen(player.position, camera, canvasSize);
+          ctx.save();
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([10, 8]);
+          ctx.beginPath();
+          ctx.moveTo(startPos.x, startPos.y);
+          pathTargets.forEach(pt => {
+              const p = worldToScreen(pt, camera, canvasSize);
+              ctx.lineTo(p.x, p.y);
+          });
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+      }
+
       [...traffic, ...npcs].forEach(e => {
           if(e.position.x < viewBounds.left || e.position.x > viewBounds.right || e.position.y < viewBounds.top || e.position.y > viewBounds.bottom) return;
           const { x, y } = worldToScreen(e.position, camera, canvasSize);
@@ -162,7 +295,17 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStateRef, onSetTargetPositi
       });
       
       const playerScreenPos = worldToScreen(player.position, camera, canvasSize);
-      if (player.isInvulnerable && Math.floor(time / 100) % 2 === 0) { /* don't draw player */ } 
+      if (player.speedBoostTimer > 0) {
+          const boostRatio = Math.min(1, player.speedBoostTimer / SPEED_BOOST_DURATION);
+          ctx.save();
+          ctx.globalAlpha = 0.35 + 0.15 * Math.sin(time / 120);
+          ctx.fillStyle = 'rgba(255, 224, 102, 0.55)';
+          ctx.beginPath();
+          ctx.arc(playerScreenPos.x, playerScreenPos.y - 12, 38 + boostRatio * 24, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+      }
+      if (player.isInvulnerable && Math.floor(time / 100) % 2 === 0) { /* don't draw player */ }
       else {
           ctx.font = "48px sans-serif";
           ctx.fillText(player.upgrades.has('bicycle') ? "🚴" : "🧍", playerScreenPos.x, playerScreenPos.y);
@@ -185,7 +328,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStateRef, onSetTargetPositi
           ctx.restore();
       }
 
-      floatingTexts.forEach(text => { /* ... text drawing ... */ });
+      floatingTexts.forEach(text => {
+        const { x, y } = worldToScreen(text.position, camera, canvasSize);
+        ctx.save();
+        ctx.font = 'bold 18px sans-serif';
+        ctx.globalAlpha = Math.max(0, text.life);
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(text.text, x, y);
+        ctx.fillStyle = text.color;
+        ctx.fillText(text.text, x, y);
+        ctx.restore();
+      });
       
       clickMarkers.forEach(marker => {
         const { x, y } = worldToScreen(marker.position, camera, canvasSize);
@@ -209,7 +363,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStateRef, onSetTargetPositi
     
     animationFrameId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [gameStateRef, canvasSize, onSetTargetPosition, loadedImages]);
+  }, [gameStateRef, canvasSize, onSetTargetPosition, loadedImages, devicePixelRatio]);
 
   return (
     <>

@@ -82,7 +82,12 @@ class AudioService {
     this.playTone(600, 0.3, 'sawtooth', 0.5);
     this.playTone(800, 0.3, 'sawtooth', 0.5);
   }
-  
+
+  playBoostSound() {
+    this.playTone(520, 0.18, 'sawtooth', 0.35);
+    setTimeout(() => this.playTone(980, 0.2, 'square', 0.28), 90);
+  }
+
   playTrainDing() {
     this.playTone(1200, 0.2, 'sine', 0.6);
     setTimeout(() => this.playTone(1200, 0.2, 'sine', 0.6), 300);

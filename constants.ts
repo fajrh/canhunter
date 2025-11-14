@@ -41,10 +41,18 @@ export const PLAYER_RADIUS = 30;
 export const COLLECTIBLE_RADIUS = 20;
 export const COLLECTIBLE_LIFESPAN = 10 * 60 * 1000; // 10 minutes
 export const COLLECTIBLE_VALUE = 0.10; // $0.10
+export const SPEED_BOOST_CHAIN_WINDOW = 5000; // ms to maintain chain
+export const SPEED_BOOST_CHAIN_THRESHOLD = 5; // items in chain to trigger boost
+export const SPEED_BOOST_BATCH_TRIGGER = 3; // items grabbed at once to trigger boost
+export const SPEED_BOOST_DURATION = 6000; // ms of boost duration
+export const SPEED_BOOST_MULTIPLIER = 1.35; // movement multiplier during boost
 export const PLAYER_MAX_HP = 100;
 export const TRAFFIC_DAMAGE = 30;
 export const NPC_SHOVE_DAMAGE = 10;
 export const CANAL_COLD_DAMAGE = 1; // per second
+export const BRIDGE_APPROACH_DISTANCE = 280; // px distance to suggest nearest bridge
+export const BRIDGE_PATH_SAMPLES = 24; // sampling resolution for bridge pathfinding
+export const BRIDGE_SNAP_PADDING = 28; // px padding when checking bridge clicks
 
 // --- ZONES (Areas of Ottawa) ---
 export const ZONES: Zone[] = [
