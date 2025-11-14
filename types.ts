@@ -48,12 +48,16 @@ export interface Quest {
 export interface PlayerState {
   position: Vector2;
   targetPosition: Vector2 | null;
+  pathQueue: Vector2[];
   speed: number;
   inventory: Collectible[];
   inventoryCap: number;
   money: number;
   upgrades: Set<UpgradeId>;
   hasCollectedFirstCan: boolean;
+  speedBoostTimer: number;
+  collectChain: number;
+  lastCollectTime: number;
   hp: number;
   maxHp: number;
   stash: Collectible[];
@@ -222,4 +226,5 @@ export interface UIState {
     hasCollectedFirstCan: boolean;
     isInventoryFull: boolean;
     purchasedUpgrades: Set<UpgradeId>;
+    speedBoostTimer: number;
 }
