@@ -1,8 +1,9 @@
 // constants.ts
-import type { Zone, Upgrade, UpgradeId, PlayerState, House, WaterBody, Bridge, Landmark, Vector2, Foliage, Quest, Crosswalk } from './types.ts';
+import type { Zone, Upgrade, UpgradeId, PlayerState, House, WaterBody, Bridge, Landmark, Vector2, Foliage, Quest, Crosswalk, RoadSegment } from './types.ts';
 
 export const GAME_WORLD_SIZE = { width: 4000, height: 6000 };
 export const MAX_COLLECTIBLES = 1500;
+export const INITIAL_COLLECTIBLE_TARGET = 140;
 
 // --- Helpers (seeded RNG + geometry) ---
 const mulberry32 = (seed: number) => {
@@ -41,10 +42,20 @@ export const PLAYER_RADIUS = 30;
 export const COLLECTIBLE_RADIUS = 20;
 export const COLLECTIBLE_LIFESPAN = 10 * 60 * 1000; // 10 minutes
 export const COLLECTIBLE_VALUE = 0.10; // $0.10
+export const SPEED_BOOST_CHAIN_WINDOW = 5000; // ms to maintain chain
+export const SPEED_BOOST_CHAIN_THRESHOLD = 5; // items in chain to trigger boost
+export const SPEED_BOOST_BATCH_TRIGGER = 3; // items grabbed at once to trigger boost
+export const SPEED_BOOST_DURATION = 6000; // ms of boost duration
+export const SPEED_BOOST_MULTIPLIER = 1.35; // movement multiplier during boost
 export const PLAYER_MAX_HP = 100;
 export const TRAFFIC_DAMAGE = 30;
 export const NPC_SHOVE_DAMAGE = 10;
 export const CANAL_COLD_DAMAGE = 1; // per second
+export const BRIDGE_APPROACH_DISTANCE = 280; // px distance to suggest nearest bridge
+export const BRIDGE_PATH_SAMPLES = 24; // sampling resolution for bridge pathfinding
+export const BRIDGE_SNAP_PADDING = 28; // px padding when checking bridge clicks
+export const ROAD_TEXTURE_URL = 'https://i.ibb.co/s9V8fFRv/download.jpg';
+export const ROAD_TILE_SIZE = 64;
 
 // --- ZONES (Areas of Ottawa) ---
 export const ZONES: Zone[] = [
@@ -165,6 +176,19 @@ export const TRAFFIC_PATHS = [
     [{ x: 1200, y: 2100 }, { x: 2600, y: 2100 }], // Wellington St
     [{ x: 1250, y: 3000 }, { x: 1250, y: 4500 }], // Bronson Ave
     [{ x: 100, y: 2850 }, { x: 1000, y: 2850 }], // Wellington West
+];
+
+export const ROADS: RoadSegment[] = [
+    { id: 'elgin', from: { x: 1850, y: 1200 }, to: { x: 1850, y: 5000 }, width: 150 },
+    { id: 'wellington', from: { x: 800, y: 2100 }, to: { x: 3200, y: 2100 }, width: 160 },
+    { id: 'bronson', from: { x: 1250, y: 2600 }, to: { x: 1250, y: 5200 }, width: 150 },
+    { id: 'bank', from: { x: 1750, y: 1800 }, to: { x: 1750, y: 5200 }, width: 140 },
+    { id: 'sussex', from: { x: 2400, y: 1400 }, to: { x: 2400, y: 2600 }, width: 120 },
+    { id: 'rideau', from: { x: 2100, y: 2300 }, to: { x: 2800, y: 2300 }, width: 140 },
+    { id: 'bridge_macdonald_cartier', from: { x: 3000, y: 1500 }, to: { x: 3000, y: 900 }, width: 130 },
+    { id: 'bridge_portage', from: { x: 1800, y: 1500 }, to: { x: 1800, y: 900 }, width: 130 },
+    { id: 'bridge_chaudiere', from: { x: 1200, y: 1500 }, to: { x: 1200, y: 900 }, width: 130 },
+    { id: 'bridge_champlain', from: { x: 500, y: 1600 }, to: { x: 500, y: 900 }, width: 140 },
 ];
 export const CROSSWALKS: Crosswalk[] = [
     { position: { x: 1850, y: 2500 }, rect: [1820, 2480, 60, 40], active: false, timer: 0 },
