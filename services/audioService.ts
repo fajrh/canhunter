@@ -2,6 +2,7 @@ class AudioService {
   private audioCtx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   public isMuted: boolean = false;
+  private voices: SpeechSynthesisVoice[] = [];
 
   init() {
     if (this.audioCtx) return;
@@ -9,9 +10,41 @@ class AudioService {
       this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.masterGain = this.audioCtx.createGain();
       this.masterGain.connect(this.audioCtx.destination);
+
+      // Initialize TTS
+      if ('speechSynthesis' in window) {
+        speechSynthesis.onvoiceschanged = () => {
+          this.voices = speechSynthesis.getVoices();
+        };
+        this.voices = speechSynthesis.getVoices();
+      }
+
     } catch (e) {
       console.error("Web Audio API is not supported in this browser");
     }
+  }
+
+  speak(text: string, lang: 'en-US' | 'fr-CA') {
+    if (this.isMuted || !('speechSynthesis' in window)) return;
+    
+    speechSynthesis.cancel(); // Stop any previous speech
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    
+    // Voice selection
+    const preferredVoice = this.voices.find(voice => voice.lang === lang);
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    } else {
+       const fallbackVoice = this.voices.find(voice => voice.lang.startsWith(lang.substring(0, 2)));
+       if(fallbackVoice) utterance.voice = fallbackVoice;
+    }
+    
+    utterance.rate = 1.1;
+    utterance.pitch = 1;
+
+    speechSynthesis.speak(utterance);
   }
 
   private playTone(freq: number, duration: number, type: OscillatorType = 'sine', volume: number = 0.5) {
@@ -63,6 +96,9 @@ class AudioService {
     this.isMuted = !this.isMuted;
     if (this.isMuted) {
       this.masterGain?.gain.setValueAtTime(0, this.audioCtx?.currentTime || 0);
+      if ('speechSynthesis' in window) {
+        speechSynthesis.cancel();
+      }
     } else {
       this.masterGain?.gain.setValueAtTime(1, this.audioCtx?.currentTime || 0);
     }

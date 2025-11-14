@@ -24,20 +24,21 @@ export interface Collectible {
   imageUrl?: string;
 }
 
-export type UpgradeId = 'bag' | 'cart' | 'bell' | 'otrain' | 'map' | 'vest' | 'bicycle';
+export type UpgradeId = 'bag' | 'cart' | 'bell' | 'otrain' | 'map' | 'vest' | 'bicycle' | 'bikeTrailer' | 'parka';
 
 export interface Upgrade {
   id: UpgradeId;
-  name: string;
-  description: string;
+  nameKey: string;
+  descriptionKey: string;
   cost: number;
   emoji: string;
+  requires?: UpgradeId;
   apply: (playerState: PlayerState) => Partial<PlayerState>;
 }
 
 export interface Quest {
   id: number;
-  description: string;
+  descriptionKey: string;
   targetZone: string | null;
   targetCount: number;
   reward: number;
@@ -53,6 +54,12 @@ export interface PlayerState {
   money: number;
   upgrades: Set<UpgradeId>;
   hasCollectedFirstCan: boolean;
+  hp: number;
+  maxHp: number;
+  stash: Collectible[];
+  stashCap: number;
+  isInvulnerable: boolean;
+  invulnerableTimer: number;
 }
 
 export type WaterBody = {
@@ -63,13 +70,15 @@ export type WaterBody = {
 
 export type Bridge = {
   name: string;
+  nameKey: string;
   from: Vector2;
   to: Vector2;
   rect: [number, number, number, number]; // for collision detection
+  repairGag?: boolean;
 };
 
 export type Landmark = {
-  name: string;
+  nameKey: string;
   position: Vector2;
   emoji?: string;
 };
@@ -84,7 +93,7 @@ export interface FlyingCan {
 }
 
 export interface Foliage {
-    type: 'tree' | 'bush';
+    type: 'tree' | 'bush' | 'other';
     position: Vector2;
     emoji: string;
     variant: number;
@@ -96,6 +105,16 @@ export interface FloatingText {
     position: Vector2;
     life: number; // starts at 1, goes to 0
     color: string;
+}
+
+export interface ChatBubble {
+    id: number;
+    text: string;
+    position: Vector2;
+    life: number; // duration in seconds
+    lines: string[];
+    width: number;
+    height: number;
 }
 
 export interface ClickMarker {
@@ -122,11 +141,44 @@ export interface Critter {
   nextGoal?: Vector2;
 }
 
+export type TrafficVehicleType = 'car' | 'bus';
+export interface TrafficVehicle {
+    id: number;
+    type: TrafficVehicleType;
+    position: Vector2;
+    speed: number;
+    path: Vector2[];
+    pathIndex: number;
+    emoji: string;
+}
+
+export type NPCType = 'security' | 'complainer' | 'general';
+export interface NPC {
+    id: number;
+    type: NPCType;
+    position: Vector2;
+    emoji: string;
+    state: 'idle' | 'chasing';
+    timer: number;
+    dialogueCooldown: number;
+}
+
+export interface Crosswalk {
+    position: Vector2;
+    rect: [number, number, number, number];
+    active: boolean;
+    timer: number;
+}
+
+export type Language = 'en' | 'fr';
+
 export interface GameState {
   player: PlayerState;
   collectibles: Collectible[];
-  kiosk: Vector2;
-  isPlayerNearKiosk: boolean;
+  refundDepot: Vector2;
+  stashHouse: Vector2;
+  isPlayerNearDepot: boolean;
+  isPlayerNearStash: boolean;
   zones: Zone[];
   camera: Vector2;
   gameTime: number;
@@ -142,4 +194,32 @@ export interface GameState {
   floatingTexts: FloatingText[];
   clickMarkers: ClickMarker[];
   critters: Critter[];
+  language: Language;
+  flashMessageKey: string | null;
+  traffic: TrafficVehicle[];
+  npcs: NPC[];
+  crosswalks: Crosswalk[];
+  isCashingOut: boolean;
+  isWinter: boolean;
+  dialogue: ChatBubble[];
+  closestBridge: Bridge | null;
+}
+
+// Separate state for UI to avoid re-rendering the whole app on every frame
+export interface UIState {
+    money: number;
+    inventoryCount: number;
+    inventoryCap: number;
+    stashCount: number;
+    stashCap: number;
+    hp: number;
+    maxHp: number;
+    activeQuest: Quest | null;
+    gameTime: number;
+    language: Language;
+    flashMessageKey: string | null;
+    isCashingOut: boolean;
+    hasCollectedFirstCan: boolean;
+    isInventoryFull: boolean;
+    purchasedUpgrades: Set<UpgradeId>;
 }

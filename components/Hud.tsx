@@ -1,53 +1,61 @@
 import React from 'react';
-import type { Quest } from '../types.ts';
+import type { Quest, Language } from '../types.ts';
+import { t } from '../services/localization.ts';
 
 interface HudProps {
   money: number;
   inventoryCount: number;
   inventoryCap: number;
+  stashCount: number;
+  stashCap: number;
+  hp: number;
+  maxHp: number;
   activeQuest: Quest | null;
   gameTime: number;
+  language: Language;
 }
 
-const Hud: React.FC<HudProps> = ({ money, inventoryCount, inventoryCap, activeQuest, gameTime }) => {
+const Hud: React.FC<HudProps> = ({ money, inventoryCount, inventoryCap, stashCount, stashCap, hp, maxHp, activeQuest, gameTime, language }) => {
   const inventoryColor = inventoryCount >= inventoryCap ? 'text-red-400' : 'text-white';
-  const questProgress = activeQuest ? (activeQuest.progress / activeQuest.targetCount) * 100 : 0;
+  const stashColor = stashCount >= stashCap ? 'text-red-400' : 'text-white';
+  const hpColor = hp / maxHp < 0.3 ? 'bg-red-500' : 'bg-green-500';
 
-  // Convert gameTime (ms) to in-game clock time (1 real sec = 1 game min)
   const formatGameTime = (time: number): string => {
     const totalGameSeconds = time / 1000;
     const gameMinutes = Math.floor(totalGameSeconds % 60);
-    // Start day at 8 AM. A full 24h cycle takes 24 real minutes.
     let gameHours = (8 + Math.floor(totalGameSeconds / 60)) % 24;
-    
     const ampm = gameHours >= 12 ? 'PM' : 'AM';
-    gameHours = gameHours % 12;
-    gameHours = gameHours ? gameHours : 12; // the hour '0' should be '12'
-    
+    gameHours = gameHours % 12; gameHours = gameHours ? gameHours : 12;
     const minutesStr = gameMinutes < 10 ? `0${gameMinutes}` : gameMinutes;
-    
     return `${gameHours}:${minutesStr} ${ampm}`;
   };
   
   return (
     <div className="absolute top-0 left-0 right-0 p-2 sm:p-4 bg-black/30 backdrop-blur-sm pointer-events-none text-outline">
-      <div className="flex justify-between items-start text-lg sm:text-2xl font-bold">
+      <div className="flex justify-between items-start text-base sm:text-xl font-bold">
         <div className="flex items-center space-x-2 sm:space-x-4">
           <span>💰 ${money.toFixed(2)}</span>
-          <span className={inventoryColor}>
-            ♻️ {inventoryCount}/{inventoryCap}
-          </span>
+          <span className={inventoryColor}>🎒 {inventoryCount}/{inventoryCap}</span>
+          <span className={stashColor}>📦 {stashCount}/{stashCap}</span>
         </div>
         <div className="text-right">
           <span>{formatGameTime(gameTime)}</span>
-          <p className="text-yellow-400 text-[8px] font-['Arial'] leading-none tracking-wider">v.1.2.0</p>
+           <p className="text-yellow-400 text-[8px] font-['Arial'] leading-none tracking-wider">v.1.3.2</p>
+        </div>
+      </div>
+      <div className="mt-2">
+        <div className="flex items-center">
+            <span className="text-sm font-bold mr-2">HP</span>
+            <div className="w-24 bg-gray-600 rounded-full h-4 border-2 border-black/50">
+                <div className={`${hpColor} h-full rounded-full`} style={{ width: `${(hp / maxHp) * 100}%` }}></div>
+            </div>
         </div>
       </div>
       {activeQuest && (
         <div className="mt-2">
-            <p className="text-xs sm:text-sm truncate">{activeQuest.description}</p>
+            <p className="text-xs sm:text-sm truncate">{t(activeQuest.descriptionKey, language)} ({activeQuest.progress}/{activeQuest.targetCount})</p>
             <div className="w-full bg-gray-600 rounded-full h-2.5 mt-1">
-                <div className="bg-yellow-400 h-2.5 rounded-full" style={{ width: `${Math.min(100, questProgress)}%` }}></div>
+                <div className="bg-yellow-400 h-2.5 rounded-full" style={{ width: `${Math.min(100, (activeQuest.progress / activeQuest.targetCount) * 100)}%` }}></div>
             </div>
         </div>
       )}

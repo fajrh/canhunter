@@ -1,34 +1,36 @@
 import React, { useEffect, useState } from 'react';
+import { t } from '../services/localization';
+import type { Language } from '../types';
 
 interface ToastProps {
-  message: string | null;
+  messageKey: string | null;
   onDismiss: () => void;
+  language: Language;
 }
 
-const Toast: React.FC<ToastProps> = ({ message, onDismiss }) => {
+const Toast: React.FC<ToastProps> = ({ messageKey, onDismiss, language }) => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    if (message) {
+    if (messageKey) {
       setIsVisible(true);
       const timer = setTimeout(() => {
         setIsVisible(false);
-        // Allow time for fade-out before dismissing
         setTimeout(onDismiss, 300);
       }, 2700);
       return () => clearTimeout(timer);
     } else {
       setIsVisible(false);
     }
-  }, [message, onDismiss]);
+  }, [messageKey, onDismiss]);
 
   return (
     <div
       className={`absolute top-20 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full bg-blue-500 text-white font-bold shadow-lg transition-all duration-300 pointer-events-none text-center ${
-        isVisible && message ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-5'
+        isVisible && messageKey ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-5'
       }`}
     >
-      {message}
+      {messageKey ? t(messageKey, language) : ''}
     </div>
   );
 };

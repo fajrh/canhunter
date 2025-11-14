@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import GameCanvas from './components/GameCanvas';
 import Hud from './components/Hud';
 import Controls from './components/Controls';
@@ -8,6 +8,23 @@ import { useGameEngine } from './hooks/useGameEngine';
 import { audioService } from './services/audioService';
 import GameMessage from './components/IntroPrompt';
 import HelpModal from './components/HelpModal';
+import { t } from './services/localization';
+import FlashMessage from './components/FlashMessage';
+
+const CashOutAnimation = ({ onFinish }: { onFinish: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onFinish, 4000);
+    return () => clearTimeout(timer);
+  }, [onFinish]);
+
+  return (
+    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-50 text-white text-center">
+      <div className="text-6xl animate-bounce">🚲</div>
+      <p className="text-2xl font-bold mt-4">Crossing bridge to Québec...</p>
+      <p className="text-lg">Cashing in!</p>
+    </div>
+  );
+};
 
 
 export default function App() {
@@ -17,14 +34,15 @@ export default function App() {
 
   const {
     gameState,
+    uiState,
     setTargetPosition,
     buyUpgrade,
     resetSave,
     toastMessage,
     clearToast,
+    activateCrosswalk,
+    endCashingOut,
   } = useGameEngine();
-
-  const isInventoryFull = gameState.player.inventory.length >= gameState.player.inventoryCap;
 
   const handleToggleMute = () => {
     audioService.toggleMute();
@@ -32,32 +50,39 @@ export default function App() {
   };
 
   const handleReset = () => {
-    if (window.confirm("Are you sure you want to reset all your progress? This cannot be undone.")) {
+    if (window.confirm(t('reset_confirm', uiState.language))) {
       resetSave();
     }
   };
 
-  const MemoizedGameCanvas = useMemo(() => (
-    <GameCanvas
-      gameState={gameState}
-      onSetTargetPosition={setTargetPosition}
-      isInventoryFull={isInventoryFull}
-    />
-  ), [gameState, setTargetPosition, isInventoryFull]);
+  // The game engine is not ready on the first render
+  if (!uiState) {
+    return <div className="w-full h-full bg-gray-800 flex items-center justify-center text-white">Loading...</div>;
+  }
 
   return (
     <div className="w-full h-full bg-gray-800 text-white font-sans select-none touch-callout-none">
-      {!gameState.player.hasCollectedFirstCan && <GameMessage text="Click to move. Walk near items to collect!" />}
-      {isInventoryFull && gameState.player.hasCollectedFirstCan && <GameMessage text="Inventory Full! Go to the kiosk 🏪 to sell." />}
+      {!uiState.hasCollectedFirstCan && <GameMessage text={t('intro_prompt', uiState.language)} />}
+      {uiState.isInventoryFull && uiState.hasCollectedFirstCan && <GameMessage text={t('inventory_full_prompt', uiState.language)} />}
       
-      {MemoizedGameCanvas}
+      <FlashMessage messageKey={uiState.flashMessageKey} language={uiState.language} />
+
+      <GameCanvas
+        gameStateRef={gameState}
+        onSetTargetPosition={setTargetPosition}
+      />
 
       <Hud
-        money={gameState.player.money}
-        inventoryCount={gameState.player.inventory.length}
-        inventoryCap={gameState.player.inventoryCap}
-        activeQuest={gameState.activeQuest}
-        gameTime={gameState.gameTime}
+        money={uiState.money}
+        inventoryCount={uiState.inventoryCount}
+        inventoryCap={uiState.inventoryCap}
+        activeQuest={uiState.activeQuest}
+        gameTime={uiState.gameTime}
+        language={uiState.language}
+        hp={uiState.hp}
+        maxHp={uiState.maxHp}
+        stashCount={uiState.stashCount}
+        stashCap={uiState.stashCap}
       />
 
       <Controls
@@ -65,23 +90,28 @@ export default function App() {
         onHelp={() => setIsHelpOpen(true)}
         onMute={handleToggleMute}
         isMuted={isMuted}
+        language={uiState.language}
+        onCrosswalk={activateCrosswalk}
       />
 
       {isUpgradesOpen && (
         <UpgradesModal
-          playerMoney={gameState.player.money}
-          purchasedUpgrades={gameState.player.upgrades}
+          playerMoney={uiState.money}
+          purchasedUpgrades={uiState.purchasedUpgrades}
           onClose={() => setIsUpgradesOpen(false)}
           onBuyUpgrade={buyUpgrade}
           onReset={handleReset}
+          language={uiState.language}
         />
       )}
 
       {isHelpOpen && (
-          <HelpModal onClose={() => setIsHelpOpen(false)} />
+          <HelpModal onClose={() => setIsHelpOpen(false)} language={uiState.language} />
       )}
 
-      <Toast message={toastMessage} onDismiss={clearToast} />
+      {uiState.isCashingOut && <CashOutAnimation onFinish={endCashingOut} />}
+
+      <Toast messageKey={toastMessage} onDismiss={clearToast} language={uiState.language} />
     </div>
   );
 }

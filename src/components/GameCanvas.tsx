@@ -189,7 +189,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onSetTargetPosition,
 
       ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
 
-      // Navigation Arrow & Minimap rendering...
+      // Kiosk direction indicator (bottom-left)
+      const kioskIndicatorPadding = 30;
+      const kioskIndicatorX = kioskIndicatorPadding;
+      const kioskIndicatorY = canvasSize.height - kioskIndicatorPadding;
+      const angleToKiosk = Math.atan2(kiosk.y - player.position.y, kiosk.x - player.position.x);
+
+      ctx.save();
+      ctx.translate(kioskIndicatorX, kioskIndicatorY);
+      ctx.rotate(angleToKiosk);
+      ctx.font = "24px sans-serif";
+      ctx.fillStyle = "rgba(255, 215, 0, 0.8)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 5;
+      ctx.fillText("›", 0, 0);
+      ctx.restore();
 
       animationFrameRef.current = requestAnimationFrame(render);
     };

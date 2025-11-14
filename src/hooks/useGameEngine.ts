@@ -15,8 +15,14 @@ const isPointInRect = (point: Vector2, rect: [number, number, number, number]): 
     const [x, y, w, h] = rect;
     return point.x >= x && point.x <= x + w && point.y >= y && point.y <= y + h;
 };
+
 const isPointOnBridge = (point: Vector2, bridges: Bridge[]): boolean => {
-    return bridges.some(b => isPointInRect(point, b.rect));
+    const PADDING = 20; // Add padding to make bridges easier to click on
+    return bridges.some(b => {
+      const [x, y, w, h] = b.rect;
+      return point.x >= x - PADDING && point.x <= x + w + PADDING &&
+             point.y >= y - PADDING && point.y <= y + h + PADDING;
+    });
 };
 const rand = (a:number, b:number) => a + Math.random() * (b-a);
 const len = (v:Vector2) => Math.hypot(v.x, v.y);

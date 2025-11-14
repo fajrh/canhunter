@@ -1,286 +1,382 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-// FIX: Imported the 'Bridge' type to resolve a TypeScript error.
-import type { GameState, PlayerState, Collectible, Vector2, UpgradeId, Quest, Zone, Critter, CritterKind, Bridge, FloatingText } from '../types.ts';
+import type { GameState, PlayerState, Collectible, Vector2, UpgradeId, Quest, Critter, CritterKind, Bridge, FloatingText, Language, TrafficVehicle, NPC, ChatBubble, NPCType, UIState, Zone } from '../types.ts';
 import {
-  KIOSK_POSITION, KIOSK_INTERACTION_RADIUS, PLAYER_BASE_SPEED, BASE_INVENTORY_CAP,
+  REFUND_DEPOT_POSITION, STASH_HOUSE_POSITION, KIOSK_INTERACTION_RADIUS, PLAYER_BASE_SPEED, BASE_INVENTORY_CAP,
   PLAYER_RADIUS, COLLECTIBLE_RADIUS, COLLECTIBLE_LIFESPAN, COLLECTIBLE_VALUE, ZONES, UPGRADES, QUESTS,
-  HOME_POSITION, HOUSES, WATER_BODIES, BRIDGES, LANDMARKS, CAN_IMAGE_URLS, FOLIAGE, MAX_COLLECTIBLES, isPointInWater,
-  CRITTER_SPAWNS, CRITTER_IDLE_DUR, CRITTER_WALK_DUR, CRITTER_TURN_MAX, CRITTER_UPDATE_RATE, CRITTER_AVOID_WATER
+  HOUSES, WATER_BODIES, BRIDGES, LANDMARKS, CAN_IMAGE_URLS, FOLIAGE, MAX_COLLECTIBLES, isPointInWater,
+  CRITTER_SPAWNS, QUEBEC_BORDER_Y, isInQuebec, PLAYER_MAX_HP, TRAFFIC_PATHS, TRAFFIC_DAMAGE, NPC_SPAWNS, NPC_SHOVE_DAMAGE, CANAL_COLD_DAMAGE, CROSSWALKS, BARKS_GENERAL, BARKS_POLICE, BARKS_QC
 } from '../constants.ts';
 import { audioService } from '../services/audioService.ts';
 import { saveService } from '../services/saveService.ts';
 
-// --- Geometry & Helper Utilities ---
 const isPointInRect = (point: Vector2, rect: [number, number, number, number]): boolean => {
     const [x, y, w, h] = rect;
     return point.x >= x && point.x <= x + w && point.y >= y && point.y <= y + h;
 };
+
+// FIX: Added missing pointInPoly function for checking if player is in the canal.
+const pointInPoly = (pt: Vector2, poly: Vector2[]): boolean => {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y;
+    const xj = poly[j].x, yj = poly[j].y;
+    const intersect = ((yi > pt.y) !== (yj > pt.y)) &&
+      (pt.x < ((xj - xi) * (pt.y - yi)) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+};
+
 const isPointOnBridge = (point: Vector2, bridges: Bridge[]): boolean => {
-    return bridges.some(b => isPointInRect(point, b.rect));
+    const PADDING = 20;
+    return bridges.some(b => isPointInRect(point, [b.rect[0]-PADDING, b.rect[1]-PADDING, b.rect[2]+PADDING*2, b.rect[3]+PADDING*2]));
 };
 const rand = (a:number, b:number) => a + Math.random() * (b-a);
-const len = (v:Vector2) => Math.hypot(v.x, v.y);
-const norm = (v:Vector2) => { const L=len(v)||1; return {x:v.x/L,y:v.y/L}; };
 
-// --- Critter Logic ---
-let critterIdCounter = 0;
-const spawnCritter = (kind: CritterKind, pos: Vector2): Critter => {
-  const spd = kind==='cat' ? rand(28, 42) : rand(30, 48);
-  return {
-    id: critterIdCounter++, kind, pos:{...pos}, state:'IDLE', dir: rand(0, Math.PI * 2),
-    speed: spd, tState: 0, tAnim: 0, anim: kind+'_idle',
-    bbox: { w: 24, h: 24 }, nextGoal: undefined
-  };
+let critterIdCounter = 0, trafficIdCounter = 0, npcIdCounter = 0;
+const spawnCritter = (kind: CritterKind, pos: Vector2): Critter => ({ id: critterIdCounter++, kind, pos:{...pos}, state:'IDLE', dir: rand(0, Math.PI * 2), speed: kind==='cat' ? rand(28, 42) : rand(30, 48), tState: 0, tAnim: 0, anim: kind+'_idle', bbox: { w: 24, h: 24 } });
+const spawnTraffic = (): TrafficVehicle => {
+    const path = [...TRAFFIC_PATHS[Math.floor(Math.random() * TRAFFIC_PATHS.length)]];
+    if (Math.random() > 0.5) path.reverse();
+    const type = Math.random() > 0.8 ? 'bus' : 'car';
+    return { id: trafficIdCounter++, type, position: {...path[0]}, speed: rand(60, 90), path, pathIndex: 1, emoji: type === 'bus' ? '🚌' : '🚗' };
+};
+const spawnNpc = (type: NPCType, pos: Vector2): NPC => {
+    let emoji = '🧑';
+    if(type === 'security') emoji = '👮';
+    if(type === 'complainer') emoji = '😠';
+    return { id: npcIdCounter++, type, position: pos, emoji, state: 'idle', timer: rand(2,5), dialogueCooldown: 0 };
 };
 
 const getInitialPlayerState = (): PlayerState => ({
-  position: HOME_POSITION,
-  targetPosition: null,
-  speed: PLAYER_BASE_SPEED,
-  inventory: [],
-  inventoryCap: BASE_INVENTORY_CAP,
-  money: 0,
-  upgrades: new Set(),
-  hasCollectedFirstCan: false,
+  position: {x: 1750, y: 3850}, targetPosition: null, speed: PLAYER_BASE_SPEED,
+  inventory: [], inventoryCap: BASE_INVENTORY_CAP, money: 0, upgrades: new Set(), hasCollectedFirstCan: false,
+  hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP, stash: [], stashCap: 50, isInvulnerable: false, invulnerableTimer: 0,
 });
 
+// Create a temporary canvas context for text measurement to avoid touching the DOM
+const tempCtx = document.createElement('canvas').getContext('2d')!;
+tempCtx.font = 'bold 8pt Arial';
+
+const calculateBubbleLayout = (text: string): { lines: string[], width: number, height: number } => {
+    const maxWidth = 150;
+    const lineHeight = 12;
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = words[0];
+    let measuredWidth = 0;
+
+    for (let i = 1; i < words.length; i++) {
+        const word = words[i];
+        const width = tempCtx.measureText(currentLine + " " + word).width;
+        if (width < maxWidth) {
+            currentLine += " " + word;
+        } else {
+            lines.push(currentLine);
+            measuredWidth = Math.max(measuredWidth, tempCtx.measureText(currentLine).width);
+            currentLine = word;
+        }
+    }
+    lines.push(currentLine);
+    measuredWidth = Math.max(measuredWidth, tempCtx.measureText(currentLine).width);
+    
+    const bubbleWidth = measuredWidth + 20;
+    const bubbleHeight = lines.length * lineHeight + 15;
+    return { lines, width: bubbleWidth, height: bubbleHeight };
+};
+
 export const useGameEngine = () => {
-  const [gameState, setGameState] = useState<GameState>(() => {
-    const saved = saveService.loadGame();
-    const playerState = saved ? { ...getInitialPlayerState(), ...saved.player, upgrades: new Set(Array.from(saved.player.upgrades)), hasCollectedFirstCan: saved.player.hasCollectedFirstCan || false } : getInitialPlayerState();
-    return {
-      player: playerState,
-      collectibles: saved?.collectibles || [],
-      kiosk: KIOSK_POSITION,
-      isPlayerNearKiosk: false,
-      zones: ZONES,
-      houses: HOUSES,
-      waterBodies: WATER_BODIES,
-      bridges: BRIDGES,
-      landmarks: LANDMARKS,
-      foliage: FOLIAGE,
-      camera: { ...playerState.position },
-      gameTime: saved?.gameTime || 0,
-      activeQuest: saved?.activeQuest || { ...QUESTS[0], progress: 0 },
-      lastSellTime: saved?.lastSellTime || 0,
-      flyingCans: [],
-      flyingCanIdCounter: 0,
-      floatingTexts: [],
-      clickMarkers: [],
-      critters: CRITTER_SPAWNS.map(c => spawnCritter(c.kind, c.pos)),
-    };
-  });
+  const gameState = useRef<GameState>(null!);
+  const [uiState, setUiState] = useState<UIState>(null!);
+  
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const lastTimeRef = useRef<number>(performance.now());
-  const gameLoopRef = useRef<number | null>(null);
-  const collectibleIdCounter = useRef(Math.max(0, ...gameState.collectibles.map(c => c.id)) + 1);
+  const lastTimeRef = useRef<number | null>(null);
+  const animationFrameIdRef = useRef<number | null>(null);
+  const collectibleIdCounter = useRef(1);
   const effectIdCounter = useRef(0);
-  const critterLogicAccumulator = useRef(0);
+  const flashMessageTimeoutRef = useRef<number | null>(null);
+  const oTrainTickerTimeoutRef = useRef<number | null>(null);
 
-  const setToast = (message: string, duration: number = 3000) => {
-    setToastMessage(message);
-    setTimeout(() => setToastMessage(null), duration);
-  };
+  // Initialize game state
+  if (gameState.current === null) {
+      const saved = saveService.loadGame();
+      const playerState = saved ? { ...getInitialPlayerState(), ...saved.player, upgrades: new Set(Array.from(saved.player.upgrades)), hasCollectedFirstCan: saved.player.hasCollectedFirstCan || false } : getInitialPlayerState();
+      collectibleIdCounter.current = saved ? Math.max(1, ...saved.collectibles.map(c => c.id)) + 1 : 1;
+      
+      gameState.current = {
+        player: playerState, collectibles: saved?.collectibles || [], refundDepot: REFUND_DEPOT_POSITION, stashHouse: STASH_HOUSE_POSITION,
+        isPlayerNearDepot: false, isPlayerNearStash: false, zones: ZONES, houses: HOUSES, waterBodies: WATER_BODIES, bridges: BRIDGES,
+        landmarks: LANDMARKS, foliage: FOLIAGE, camera: { ...playerState.position }, gameTime: saved?.gameTime || 0, activeQuest: saved?.activeQuest || { ...QUESTS[0], progress: 0 },
+        lastSellTime: saved?.lastSellTime || 0, flyingCans: [], flyingCanIdCounter: 0, floatingTexts: [], clickMarkers: [],
+        critters: CRITTER_SPAWNS.map(c => spawnCritter(c.kind, c.pos)), language: saved?.language || (isInQuebec(playerState.position) ? 'fr' : 'en'), flashMessageKey: null,
+        traffic: Array.from({length: 15}, spawnTraffic), npcs: NPC_SPAWNS.map(n => spawnNpc(n.type, n.pos)), crosswalks: CROSSWALKS, isCashingOut: false, isWinter: true,
+        dialogue: [], closestBridge: null,
+      };
 
+      setUiState({
+        money: playerState.money, inventoryCount: playerState.inventory.length, inventoryCap: playerState.inventoryCap,
+        stashCount: playerState.stash.length, stashCap: playerState.stashCap, hp: playerState.hp, maxHp: playerState.maxHp,
+        activeQuest: gameState.current.activeQuest, gameTime: gameState.current.gameTime, language: gameState.current.language,
+        flashMessageKey: null, isCashingOut: false, hasCollectedFirstCan: playerState.hasCollectedFirstCan,
+        isInventoryFull: playerState.inventory.length >= playerState.inventoryCap, purchasedUpgrades: playerState.upgrades,
+      });
+  }
+
+  useEffect(() => {
+     if (!oTrainTickerTimeoutRef.current) {
+        oTrainTickerTimeoutRef.current = window.setTimeout(() => {
+            if (gameState.current) gameState.current.flashMessageKey = 'flash_o_train_ticker';
+        }, 30000);
+     }
+     return () => { if (oTrainTickerTimeoutRef.current) clearTimeout(oTrainTickerTimeoutRef.current); }
+  }, []);
+
+  const setToast = (message: string, duration: number = 3000) => { setToastMessage(message); setTimeout(() => setToastMessage(null), duration); };
   const clearToast = () => setToastMessage(null);
 
   const gameLoop = useCallback((time: number) => {
-    const deltaTime = Math.min(0.05, (time - lastTimeRef.current) / 1000);
+    const lastTime = lastTimeRef.current ?? time;
+    const deltaTime = Math.min(0.05, (time - lastTime) / 1000);
     lastTimeRef.current = time;
 
-    setGameState(prev => {
-      let newState = { ...prev, gameTime: prev.gameTime + deltaTime * 1000 };
-      const { player } = newState;
+    const state = gameState.current;
+    if (!state) return;
+    
+    state.gameTime += deltaTime * 1000;
+    let { player } = state;
 
-      // Update Player
-      if (player.targetPosition) {
-        const dx = player.targetPosition.x - player.position.x;
-        const dy = player.targetPosition.y - player.position.y;
-        const distance = Math.hypot(dx, dy);
-
-        if (distance < player.speed * deltaTime) {
-          player.position = { ...player.targetPosition };
-          player.targetPosition = null;
+    const prevLanguage = state.language;
+    const currentLanguage: Language = isInQuebec(player.position) ? 'fr' : 'en';
+    if (currentLanguage !== prevLanguage) {
+        state.language = currentLanguage;
+        if (currentLanguage === 'fr') {
+            audioService.speak('Bienvenue à Québec', 'fr-CA');
+            state.flashMessageKey = 'flash_welcome_quebec';
         } else {
-          player.position.x += (dx / distance) * player.speed * deltaTime;
-          player.position.y += (dy / distance) * player.speed * deltaTime;
+            state.flashMessageKey = 'flash_welcome_ontario';
         }
+    }
+    
+    // --- Player Movement (move-then-check approach) ---
+    if (player.targetPosition) {
+      const prevPos = { ...player.position };
+      const dx = player.targetPosition.x - player.position.x;
+      const dy = player.targetPosition.y - player.position.y;
+      const distance = Math.hypot(dx, dy);
+      
+      if (distance < player.speed * deltaTime) {
+        player.position = { ...player.targetPosition };
+        player.targetPosition = null;
+      } else {
+        player.position.x += (dx / distance) * player.speed * deltaTime;
+        player.position.y += (dy / distance) * player.speed * deltaTime;
       }
+      
+      // After moving, check if the new position is invalid
+      if (isPointInWater(player.position) && !isPointOnBridge(player.position, state.bridges)) {
+        player.position = prevPos; // Revert to the last valid position
+        player.targetPosition = null; // Stop trying to move into water
+      }
+    }
+    state.camera.x += (player.position.x - state.camera.x) * 0.2;
+    state.camera.y += (player.position.y - state.camera.y) * 0.2;
 
-      // Update Camera (smooth follow)
-      const camDx = player.position.x - newState.camera.x;
-      const camDy = player.position.y - newState.camera.y;
-      newState.camera.x += camDx * 0.1;
-      newState.camera.y += camDy * 0.1;
+    // HP & Damage
+    if(player.isInvulnerable) {
+        player.invulnerableTimer -= deltaTime;
+        if(player.invulnerableTimer <= 0) player.isInvulnerable = false;
+    } else {
+        state.traffic.forEach(t => {
+            if (Math.hypot(t.position.x - player.position.x, t.position.y - player.position.y) < PLAYER_RADIUS + 20) {
+                player.hp = Math.max(0, player.hp - TRAFFIC_DAMAGE); player.isInvulnerable = true; player.invulnerableTimer = 2;
+            }
+        });
+        state.npcs.forEach(n => {
+            if (Math.hypot(n.position.x - player.position.x, n.position.y - player.position.y) < PLAYER_RADIUS + 15) {
+                player.hp = Math.max(0, player.hp - NPC_SHOVE_DAMAGE); player.isInvulnerable = true; player.invulnerableTimer = 2;
+                if (n.dialogueCooldown <= 0) {
+                    const isQuebecNpc = isInQuebec(n.position);
+                    let bark = '';
+                    if (n.type === 'security') bark = BARKS_POLICE[Math.floor(Math.random() * BARKS_POLICE.length)];
+                    else if (isQuebecNpc) bark = BARKS_QC[Math.floor(Math.random() * BARKS_QC.length)];
+                    else bark = BARKS_GENERAL[Math.floor(Math.random() * BARKS_GENERAL.length)];
+                    
+                    const layout = calculateBubbleLayout(bark);
+                    state.dialogue.push({ id: effectIdCounter.current++, text: bark, position: {...n.position}, life: 5, ...layout });
+                    audioService.speak(bark, isQuebecNpc ? 'fr-CA' : 'en-US');
+                    n.dialogueCooldown = rand(8, 15);
+                }
+            }
+        });
+        if (state.isWinter && !player.upgrades.has('parka') && WATER_BODIES.find(wb => wb.name === 'Rideau Canal' && pointInPoly(player.position, wb.polygon))) {
+            player.hp = Math.max(0, player.hp - CANAL_COLD_DAMAGE * deltaTime);
+        }
+    }
+    if(player.hp <= 0) {
+        let closestBridge = BRIDGES[0]; let minD = Infinity;
+        BRIDGES.forEach(b => { const d = Math.hypot(b.from.x - player.position.x, b.from.y - player.position.y); if(d < minD) { minD = d; closestBridge = b; } });
+        player.position = { ...closestBridge.from }; player.targetPosition = null; player.hp = PLAYER_MAX_HP; player.isInvulnerable = true; player.invulnerableTimer = 5;
+    }
+    
+    // Update Traffic, NPCs, Dialogue
+    state.traffic.forEach(t => {
+        const target = t.path[t.pathIndex];
+        const dx = target.x - t.position.x; const dy = target.y - t.position.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < t.speed * deltaTime) {
+            t.position = {...target}; t.pathIndex = (t.pathIndex + 1) % t.path.length;
+        } else {
+            t.position.x += (dx/dist) * t.speed * deltaTime; t.position.y += (dy/dist) * t.speed * deltaTime;
+        }
+    });
+    state.crosswalks.forEach(cw => { if(cw.active) { cw.timer -= deltaTime; if(cw.timer <= 0) cw.active = false; } });
+    state.npcs.forEach(n => { n.timer -= deltaTime; if (n.dialogueCooldown > 0) n.dialogueCooldown -= deltaTime; if(n.timer <= 0) { n.timer = rand(3,6); n.position.x += rand(-50,50); n.position.y += rand(-50,50); }});
+    state.dialogue = state.dialogue.map(d => ({...d, life: d.life - deltaTime})).filter(d => d.life > 0);
 
-      // Spawner logic
-      if (newState.collectibles.length < MAX_COLLECTIBLES) {
-         if (Math.random() < 0.21) {
-          const zone = ZONES[Math.floor(Math.random() * ZONES.length)];
-          if (Math.random() < zone.spawnMultiplier * 0.15) {
-              const [zx, zy, zw, zh] = zone.rect;
-              const position = { x: zx + Math.random() * zw, y: zy + Math.random() * zh };
-              if (!isPointInWater(position)) {
+    // Bridge Navigation
+    const BORDER_PROXIMITY = 300;
+    const isNearBorder = (!isInQuebec(player.position) && player.position.y < QUEBEC_BORDER_Y + BORDER_PROXIMITY) || (isInQuebec(player.position) && player.position.y > QUEBEC_BORDER_Y - BORDER_PROXIMITY);
+    if(isNearBorder && !isPointOnBridge(player.position, BRIDGES)) {
+        let closestBridge: Bridge | null = null; let minD = Infinity;
+        BRIDGES.forEach(b => { 
+            if (b.repairGag) return;
+            const midPoint = {x: b.rect[0] + b.rect[2]/2, y: b.rect[1] + b.rect[3]/2};
+            const d = Math.hypot(midPoint.x - player.position.x, midPoint.y - player.position.y); if(d < minD) { minD = d; closestBridge = b; } 
+        });
+        state.closestBridge = closestBridge;
+    } else {
+        state.closestBridge = null;
+    }
+
+    // --- Spawner ---
+    if (state.collectibles.length < MAX_COLLECTIBLES && Math.random() < 0.5) {
+        const zone = ZONES[Math.floor(Math.random() * ZONES.length)];
+        if (Math.random() < zone.spawnMultiplier * 0.2) {
+            const [zx, zy, zw, zh] = zone.rect;
+            const position = { x: zx + Math.random() * zw, y: zy + Math.random() * zh };
+            if (!isPointInWater(position)) {
                 const type = Math.random() < 0.7 ? 'can' : 'bottle';
                 const imageUrl = CAN_IMAGE_URLS[Math.floor(Math.random() * CAN_IMAGE_URLS.length)];
-
-                newState.collectibles.push({
-                    id: collectibleIdCounter.current++,
-                    type,
-                    emoji: '🥫',
-                    position,
-                    spawnTime: newState.gameTime,
-                    imageUrl,
-                });
-              }
-          }
+                state.collectibles.push({ id: collectibleIdCounter.current++, type, position, emoji: '🥫', spawnTime: state.gameTime, imageUrl });
+            }
         }
-      }
+    }
 
-      // Collectibles logic
-      const collectedToday: {collectible: Collectible, zone: Zone | undefined}[] = [];
-      const remainingCollectibles = newState.collectibles.filter(c => {
-        if (Math.hypot(c.position.x - player.position.x, c.position.y - player.position.y) < PLAYER_RADIUS + COLLECTIBLE_RADIUS) {
-          if (c.type === 'bin') { /* ... bin logic ... */ }
-          if (player.inventory.length < player.inventoryCap) {
+    // --- Collectibles ---
+    const collectedToday: {collectible: Collectible, zone?: Zone}[] = [];
+    state.collectibles = state.collectibles.filter(c => {
+      if (Math.hypot(c.position.x - player.position.x, c.position.y - player.position.y) < PLAYER_RADIUS + COLLECTIBLE_RADIUS) {
+        if (player.inventory.length < player.inventoryCap) { 
             const zone = ZONES.find(z => isPointInRect(c.position, z.rect));
             collectedToday.push({collectible: c, zone});
-            return false;
-          }
+            return false; 
         }
-        return newState.gameTime - c.spawnTime < COLLECTIBLE_LIFESPAN;
-      });
-      // ... rest of collectible logic is unchanged
-
-      if(collectedToday.length > 0) {
+      }
+      return state.gameTime - c.spawnTime < COLLECTIBLE_LIFESPAN;
+    });
+    if(collectedToday.length > 0) {
         if (!player.hasCollectedFirstCan) player.hasCollectedFirstCan = true;
         player.inventory.push(...collectedToday.map(c => c.collectible));
         if (typeof navigator.vibrate === 'function') navigator.vibrate(50);
         audioService.playPickupSound();
-        const newText: FloatingText = { 
-            id: effectIdCounter.current++, 
-            text: `+${(collectedToday.length * COLLECTIBLE_VALUE * 10).toFixed(0)}¢`, 
-            position: {...player.position, y: player.position.y - 40}, 
-            life: 1.0, 
-            color: '#39FF14' 
-        };
-        newState.floatingTexts.push(newText);
-        // ... quest logic ...
-      }
-      newState.collectibles = remainingCollectibles;
+        const newText: FloatingText = { id: effectIdCounter.current++, text: `+${(collectedToday.length * COLLECTIBLE_VALUE * 100).toFixed(0)}¢`, position: {...player.position, y: player.position.y - 40}, life: 1.0, color: '#39FF14' };
+        state.floatingTexts.push(newText);
+        if (state.activeQuest) {
+            const questItems = collectedToday.filter(c => !state.activeQuest!.targetZone || c.zone?.name === state.activeQuest!.targetZone);
+            state.activeQuest.progress += questItems.length;
+        }
+    }
 
-      // Selling Logic
-      newState.isPlayerNearKiosk = Math.hypot(player.position.x - KIOSK_POSITION.x, player.position.y - KIOSK_POSITION.y) < KIOSK_INTERACTION_RADIUS;
-      const SELL_INTERVAL = 100;
-      if (newState.isPlayerNearKiosk && player.inventory.length > 0 && newState.gameTime - (newState.lastSellTime || 0) > SELL_INTERVAL) { /* ... selling logic from before... */ }
-      
-      // Flying Cans
-      newState.flyingCans = newState.flyingCans.map(can => ({ ...can, progress: can.progress + 0.8 * deltaTime })).filter(can => can.progress < 1);
-      
-      // UI Effects
-      newState.floatingTexts = newState.floatingTexts.map(t => ({...t, life: t.life - 1.2 * deltaTime, position: {x: t.position.x, y: t.position.y - 20 * deltaTime }})).filter(t => t.life > 0);
-      newState.clickMarkers = newState.clickMarkers.map(m => ({...m, life: m.life - 1 / 0.2 * deltaTime})).filter(m => m.life > 0);
+    // --- Stash/Depot Logic ---
+    state.isPlayerNearStash = Math.hypot(player.position.x - STASH_HOUSE_POSITION.x, player.position.y - STASH_HOUSE_POSITION.y) < KIOSK_INTERACTION_RADIUS;
+    if (state.isPlayerNearStash && player.inventory.length > 0) {
+        const canMove = player.stashCap - player.stash.length;
+        const toMove = player.inventory.splice(0, canMove);
+        player.stash.push(...toMove);
+        if (toMove.length > 0) audioService.playSingleSellPop();
+        if (player.inventory.length > 0) setToast('toast_stash_full');
+    }
+    
+    state.isPlayerNearDepot = Math.hypot(player.position.x - REFUND_DEPOT_POSITION.x, player.position.y - REFUND_DEPOT_POSITION.y) < KIOSK_INTERACTION_RADIUS;
+    if (state.isPlayerNearDepot && (player.inventory.length > 0 || player.stash.length > 0) && !state.isCashingOut) {
+        state.isCashingOut = true;
+        const totalItems = player.inventory.length + player.stash.length;
+        const earnings = totalItems * COLLECTIBLE_VALUE * (player.upgrades.has('vest') ? 1.1 : 1);
+        player.money += earnings; player.inventory = []; player.stash = []; audioService.playSellSound();
+    }
+    
+    state.floatingTexts = state.floatingTexts.map(t => ({...t, life: t.life - 1.2 * deltaTime, position: {x: t.position.x, y: t.position.y - 20 * deltaTime }})).filter(t => t.life > 0);
+    state.clickMarkers = state.clickMarkers.map(m => ({...m, life: m.life - 1 / 0.2 * deltaTime})).filter(m => m.life > 0);
 
-      // --- Critter Update ---
-      critterLogicAccumulator.current += deltaTime;
-      const critterStep = 1 / CRITTER_UPDATE_RATE;
-      while (critterLogicAccumulator.current >= critterStep) {
-        newState.critters = newState.critters.map(c => {
-            // FIX: Used `newState.camera` instead of `camera` which is not defined in this scope.
-            const onScreen = Math.abs(c.pos.x - newState.camera.x) < 1000 && Math.abs(c.pos.y - newState.camera.y) < 1000; // a bit larger than screen
-            if (!onScreen) {
-                // drift a tiny bit so they don't get stuck infinitely
-                return {...c, tState: c.tState + critterStep * 0.25};
-            }
-
-            let newCritter = {...c, tState: c.tState + critterStep };
-            if (newCritter.state === 'IDLE') {
-                newCritter.anim = newCritter.kind + '_idle';
-                if (newCritter.tState >= rand(CRITTER_IDLE_DUR[0], CRITTER_IDLE_DUR[1])) {
-                    const r = rand(200, 320);
-                    const ang = newCritter.dir + rand(-CRITTER_TURN_MAX, CRITTER_TURN_MAX);
-                    const g = { x: newCritter.pos.x + Math.cos(ang) * r, y: newCritter.pos.y + Math.sin(ang) * r };
-                    newCritter.nextGoal = (CRITTER_AVOID_WATER && isPointInWater(g)) ? newCritter.pos : g;
-                    newCritter.state = 'WALK';
-                    newCritter.tState = 0;
-                }
-            } else { // WALK
-                newCritter.anim = newCritter.kind + '_walk';
-                if (!newCritter.nextGoal || len({x: newCritter.nextGoal.x - newCritter.pos.x, y: newCritter.nextGoal.y - newCritter.pos.y}) < 8) {
-                    newCritter.state = 'IDLE'; newCritter.tState = 0; newCritter.nextGoal = undefined;
-                } else {
-                    const to = { x: newCritter.nextGoal.x - newCritter.pos.x, y: newCritter.nextGoal.y - newCritter.pos.y };
-                    const dir = norm(to);
-                    newCritter.pos.x += dir.x * newCritter.speed * critterStep;
-                    newCritter.pos.y += dir.y * newCritter.speed * critterStep;
-                    newCritter.dir = Math.atan2(dir.y, dir.x);
-                }
-            }
-            return newCritter;
-        });
-        critterLogicAccumulator.current -= critterStep;
-      }
-      // Update animation timer every frame for smooth animation
-      newState.critters = newState.critters.map(c => ({...c, tAnim: c.tAnim + deltaTime }));
-
-      return newState;
-    });
-    gameLoopRef.current = requestAnimationFrame(gameLoop);
+    animationFrameIdRef.current = requestAnimationFrame(gameLoop);
   }, []);
 
+  // UI update loop
   useEffect(() => {
-    audioService.init();
-    gameLoopRef.current = requestAnimationFrame(gameLoop);
-    return () => { if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current); };
+    const uiUpdateInterval = setInterval(() => {
+      const state = gameState.current;
+      if (state) {
+        setUiState({
+            money: state.player.money, inventoryCount: state.player.inventory.length, inventoryCap: state.player.inventoryCap,
+            stashCount: state.player.stash.length, stashCap: state.player.stashCap, hp: state.player.hp, maxHp: state.player.maxHp,
+            activeQuest: state.activeQuest, gameTime: state.gameTime, language: state.language,
+            flashMessageKey: state.flashMessageKey, isCashingOut: state.isCashingOut, hasCollectedFirstCan: state.player.hasCollectedFirstCan,
+            isInventoryFull: state.player.inventory.length >= state.player.inventoryCap, purchasedUpgrades: state.player.upgrades,
+        });
+        if (state.flashMessageKey) {
+            if (flashMessageTimeoutRef.current) clearTimeout(flashMessageTimeoutRef.current);
+            flashMessageTimeoutRef.current = window.setTimeout(() => { if (gameState.current) gameState.current.flashMessageKey = null; }, 2500);
+        }
+      }
+    }, 100); // Update UI 10 times per second
+
+    return () => clearInterval(uiUpdateInterval);
+  }, []);
+  
+  useEffect(() => { 
+      audioService.init(); 
+      animationFrameIdRef.current = requestAnimationFrame(gameLoop); 
+      return () => { 
+          if (animationFrameIdRef.current) {
+              cancelAnimationFrame(animationFrameIdRef.current); 
+          }
+      }; 
   }, [gameLoop]);
 
-  useEffect(() => {
-    const saveInterval = setInterval(() => { saveService.saveGame(gameState); }, 5000);
-    return () => clearInterval(saveInterval);
-  }, [gameState]);
+  useEffect(() => { const saveInterval = setInterval(() => { if (gameState.current) saveService.saveGame(gameState.current); }, 5000); return () => clearInterval(saveInterval); }, []);
 
-  const setTargetPosition = useCallback((position: Vector2) => {
-    setGameState(prev => {
-      if (isPointInWater(position) && !isPointOnBridge(position, prev.bridges)) return prev;
-      return { ...prev, player: { ...prev.player, targetPosition: { ...position } }, clickMarkers: [...prev.clickMarkers, {id: effectIdCounter.current++, position, life: 1.0}] };
-    });
+  const setTargetPosition = useCallback((position: Vector2, isBridgeClick: boolean = false) => {
+    let targetBridge: Bridge | undefined;
+    if(!isBridgeClick){ targetBridge = BRIDGES.find(b => b.repairGag && isPointInRect(position, b.rect)); }
+    if (targetBridge) { setToast('toast_detour', 4000); } 
+    else {
+        gameState.current.player.targetPosition = { ...position };
+        gameState.current.clickMarkers.push({id: effectIdCounter.current++, position, life: 1.0});
+    }
   }, []);
 
   const buyUpgrade = (upgradeId: UpgradeId) => {
     const upgrade = UPGRADES[upgradeId];
     if (!upgrade) return;
-    setGameState(prev => {
-      if (prev.player.money >= upgrade.cost && !prev.player.upgrades.has(upgradeId)) {
-        const updatedStats = upgrade.apply(prev.player);
-        audioService.playUpgradeSound();
-        setToast(`Purchased: ${upgrade.name}!`, 3000);
-        return { ...prev, player: { ...prev.player, ...updatedStats, money: prev.player.money - upgrade.cost, upgrades: new Set(prev.player.upgrades).add(upgradeId) }};
-      } else if (prev.player.upgrades.has(upgradeId)) {
-        setToast(`Already purchased!`, 2000);
-      } else {
-        setToast(`Not enough money!`, 2000);
-      }
-      return prev;
-    });
+    const { player } = gameState.current;
+    if (upgrade.requires && !player.upgrades.has(upgrade.requires)) return;
+    if (player.money >= upgrade.cost && !player.upgrades.has(upgradeId)) {
+      const updatedStats = upgrade.apply(player);
+      Object.assign(player, updatedStats);
+      player.money -= upgrade.cost;
+      player.upgrades.add(upgradeId);
+      audioService.playUpgradeSound(); setToast('toast_purchased');
+    } else if (player.upgrades.has(upgradeId)) setToast('toast_owned');
+    else setToast('toast_no_money');
   };
   
-  const resetSave = () => {
-    saveService.clearSave();
-    const initialPlayer = getInitialPlayerState();
-    setGameState({
-      player: initialPlayer,
-      collectibles: [],
-      kiosk: KIOSK_POSITION, isPlayerNearKiosk: false,
-      zones: ZONES, houses: HOUSES, waterBodies: WATER_BODIES,
-      bridges: BRIDGES, landmarks: LANDMARKS, foliage: FOLIAGE,
-      camera: { ...initialPlayer.position }, gameTime: 0,
-      activeQuest: { ...QUESTS[0], progress: 0 }, lastSellTime: 0,
-      flyingCans: [], flyingCanIdCounter: 0,
-      floatingTexts: [], clickMarkers: [],
-      critters: CRITTER_SPAWNS.map(c => spawnCritter(c.kind, c.pos)),
-    });
-    setToast("Game progress has been reset.", 3000);
+  const resetSave = () => { saveService.clearSave(); window.location.reload(); };
+  const activateCrosswalk = () => { 
+      const state = gameState.current;
+      const nearbyCrosswalk = state.crosswalks.find(cw => Math.hypot(cw.position.x - state.player.position.x, cw.position.y - state.player.position.y) < 80);
+      if (nearbyCrosswalk) { nearbyCrosswalk.active = true; nearbyCrosswalk.timer = 5; }
   };
+  const endCashingOut = () => { if (gameState.current) gameState.current.isCashingOut = false; }
 
-  return { gameState, setTargetPosition, buyUpgrade, resetSave, toastMessage, clearToast };
+  return { gameState, uiState, setTargetPosition, buyUpgrade, resetSave, toastMessage, clearToast, activateCrosswalk, endCashingOut };
 };
