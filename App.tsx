@@ -10,6 +10,7 @@ import GameMessage from './components/IntroPrompt';
 import HelpModal from './components/HelpModal';
 import { t } from './services/localization';
 import FlashMessage from './components/FlashMessage';
+import InventoryFullPrompt from './components/InventoryFullPrompt';
 
 const CashOutAnimation = ({ onFinish }: { onFinish: () => void }) => {
   useEffect(() => {
@@ -63,7 +64,9 @@ export default function App() {
   return (
     <div className="w-full h-full bg-gray-800 text-white font-sans select-none touch-callout-none">
       {!uiState.hasCollectedFirstCan && <GameMessage text={t('intro_prompt', uiState.language)} />}
-      {uiState.isInventoryFull && uiState.hasCollectedFirstCan && <GameMessage text={t('inventory_full_prompt', uiState.language)} />}
+      {uiState.isInventoryFull && uiState.hasCollectedFirstCan && (
+        <InventoryFullPrompt text={t('inventory_full_prompt', uiState.language)} />
+      )}
       
       <FlashMessage messageKey={uiState.flashMessageKey} language={uiState.language} />
 

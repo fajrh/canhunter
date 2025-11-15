@@ -50,6 +50,7 @@ export interface PlayerState {
   targetPosition: Vector2 | null;
   pathQueue: Vector2[];
   speed: number;
+  velocity: Vector2;
   inventory: Collectible[];
   inventoryCap: number;
   money: number;
@@ -64,6 +65,13 @@ export interface PlayerState {
   stashCap: number;
   isInvulnerable: boolean;
   invulnerableTimer: number;
+}
+
+export interface RoadSegment {
+  id: string;
+  from: Vector2;
+  to: Vector2;
+  width: number;
 }
 
 export type WaterBody = {
