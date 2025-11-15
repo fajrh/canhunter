@@ -241,16 +241,47 @@ export const BRIDGES: Bridge[] = [
 // Placed relative to real downtown: Parliament just south of river,
 // ByWard east, Hintonburg/Westboro west, Glebe/Lansdowne south, etc.
 export const LANDMARKS: Landmark[] = [
-  { nameKey: 'landmark_parliament', position: { x: 1900, y: 2000 }, emoji: '🏛️' },
-  { nameKey: 'landmark_byward_market', position: { x: 2600, y: 2100 }, emoji: '🥖' },
-  { nameKey: 'landmark_national_gallery', position: { x: 2250, y: 1850 }, emoji: '🖼️' },
-  { nameKey: 'landmark_rideau_centre', position: { x: 2250, y: 2200 }, emoji: '🛍️' },
-  { nameKey: 'landmark_shaw_centre', position: { x: 2320, y: 2220 }, emoji: '🏢' },
-  { nameKey: 'landmark_uottawa', position: { x: 2450, y: 2450 }, emoji: '🎓' },
+  {
+    nameKey: 'landmark_parliament',
+    position: { x: 1900, y: 2000 },
+    emoji: '🏛️',
+    imageUrl: 'https://i.ibb.co/W4BCC2n2/Chat-GPT-Image-Nov-15-2025-01-15-40-PM.png'
+  },
+  {
+    nameKey: 'landmark_byward_market',
+    position: { x: 2600, y: 2100 },
+    emoji: '🥖',
+    imageUrl: 'https://i.ibb.co/G4LPyyz0/Chat-GPT-Image-Nov-15-2025-01-18-37-PM.png'
+  },
+  {
+    nameKey: 'landmark_national_gallery',
+    position: { x: 2250, y: 1850 },
+    emoji: '🖼️',
+    imageUrl: 'https://i.ibb.co/fVcTMqxR/Chat-GPT-Image-Nov-15-2025-01-20-46-PM.png'
+  },
+  {
+    nameKey: 'landmark_rideau_centre',
+    position: { x: 2250, y: 2200 },
+    emoji: '🛍️',
+    imageUrl: 'https://i.ibb.co/QjPjWrR5/Chat-GPT-Image-Nov-15-2025-01-22-36-PM.png'
+  },
+  {
+    nameKey: 'landmark_shaw_centre',
+    position: { x: 2320, y: 2220 },
+    emoji: '🏢',
+    imageUrl: 'https://i.ibb.co/pBPfQnWM/Chat-GPT-Image-Nov-15-2025-01-24-29-PM.png'
+  },
+  {
+    nameKey: 'landmark_uottawa',
+    position: { x: 2450, y: 2450 },
+    emoji: '🎓',
+    imageUrl: 'https://i.ibb.co/1fm6jy7F/Chat-GPT-Image-Nov-15-2025-01-26-41-PM.png'
+  },
   {
     nameKey: 'landmark_confederation_park',
     position: { x: 2050, y: 2250 },
-    emoji: '🌳'
+    emoji: '🌳',
+    imageUrl: 'https://i.ibb.co/k617h4FG/Chat-GPT-Image-Nov-15-2025-01-29-38-PM.png'
   },
   { nameKey: 'landmark_lansdowne', position: { x: 1850, y: 4300 }, emoji: '🏟️' },
   { nameKey: 'landmark_dows_lake', position: { x: 1650, y: 4700 }, emoji: '🛶' },
