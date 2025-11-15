@@ -1,252 +1,779 @@
-// constants.ts
-import type { Zone, Upgrade, UpgradeId, PlayerState, House, WaterBody, Bridge, Landmark, Vector2, Foliage, Quest, Crosswalk, RoadSegment } from './types.ts';
+import React, { useRef, useEffect, useState } from 'react';
+import type { GameState, Vector2, Bridge, ChatBubble } from '../types.ts';
+import {
+  CAN_IMAGE_URLS,
+  GAME_WORLD_SIZE,
+  CRITTER_ATLAS,
+  CRITTER_FPS_IDLE,
+  CRITTER_FPS_WALK,
+  QUEBEC_BORDER_Y,
+  SPEED_BOOST_DURATION,
+  ROADS,
+  ROAD_TEXTURE_URL,
+  ROAD_TILE_SIZE,
+} from '../constants.ts';
+import { WaterFX } from '../services/waterfx.ts';
+import { t } from '../services/localization.ts';
 
-export const GAME_WORLD_SIZE = { width: 4000, height: 6000 };
-export const MAX_COLLECTIBLES = 1500;
-export const INITIAL_COLLECTIBLE_TARGET = 140;
+interface GameCanvasProps {
+  gameStateRef: React.MutableRefObject<GameState>;
+  onSetTargetPosition: (position: Vector2, isBridgeClick?: boolean) => void;
+}
 
-// --- Helpers (seeded RNG + geometry) ---
-const mulberry32 = (seed: number) => {
-  return function() {
-    let t = (seed += 0x6D2B79F5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+const drawChatBubble = (
+  ctx: CanvasRenderingContext2D,
+  bubble: ChatBubble,
+  camera: Vector2,
+  canvasSize: { width: number; height: number }
+) => {
+  const pos = {
+    x: bubble.position.x - camera.x + canvasSize.width / 2,
+    y: bubble.position.y - camera.y + canvasSize.height / 2,
   };
-};
-const rand2 = (rng: () => number, a: number, b: number) => a + (b - a) * rng();
 
-type Polyline = Vector2[];
+  const bubbleX = pos.x - bubble.width / 2;
+  const bubbleY = pos.y - 60 - bubble.height;
 
-const pointInPoly = (pt: Vector2, poly: Vector2[]) => {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const xi = poly[i].x, yi = poly[i].y;
-    const xj = poly[j].x, yj = poly[j].y;
-    const intersect = ((yi > pt.y) !== (yj > pt.y)) &&
-      (pt.x < ((xj - xi) * (pt.y - yi)) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
+  ctx.globalAlpha = Math.min(1, bubble.life * 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.moveTo(bubbleX + 10, bubbleY);
+  ctx.lineTo(bubbleX + bubble.width - 10, bubbleY);
+  ctx.quadraticCurveTo(
+    bubbleX + bubble.width,
+    bubbleY,
+    bubbleX + bubble.width,
+    bubbleY + 10
+  );
+  ctx.lineTo(bubbleX + bubble.width, bubbleY + bubble.height - 10);
+  ctx.quadraticCurveTo(
+    bubbleX + bubble.width,
+    bubbleY + bubble.height,
+    bubbleX + bubble.width - 10,
+    bubbleY + bubble.height
+  );
+  ctx.lineTo(pos.x + 5, bubbleY + bubble.height);
+  ctx.lineTo(pos.x, bubbleY + bubble.height + 10);
+  ctx.lineTo(pos.x - 5, bubbleY + bubble.height);
+  ctx.lineTo(bubbleX + 10, bubbleY + bubble.height);
+  ctx.quadraticCurveTo(
+    bubbleX,
+    bubbleY + bubble.height,
+    bubbleX,
+    bubbleY + bubble.height - 10
+  );
+  ctx.lineTo(bubbleX, bubbleY + 10);
+  ctx.quadraticCurveTo(bubbleX, bubbleY, bubbleX + 10, bubbleY);
+  ctx.closePath();
+
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 8pt Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const lineHeight = 12;
+  for (let i = 0; i < bubble.lines.length; i++) {
+    ctx.fillText(
+      bubble.lines[i],
+      bubbleX + bubble.width / 2,
+      bubbleY + 10 + i * lineHeight
+    );
   }
-  return inside;
+  ctx.globalAlpha = 1;
 };
 
-// --- Individual Can Sprites ---
-export const CAN_IMAGE_URLS = [
-  'https://i.ibb.co/B5ZLBVn2/Chat-GPT-Image-Nov-10-2025-08-47-56-AM.png', 'https://i.ibb.co/xKdvMFnZ/Chat-GPT-Image-Nov-10-2025-08-48-57-AM.png', 'https://i.ibb.co/4gVTSBFG/Chat-GPT-Image-Nov-10-2025-08-50-44-AM.png', 'https://i.ibb.co/TM2CQ5cQ/Chat-GPT-Image-Nov-10-2025-08-51-45-AM.png', 'https://i.ibb.co/gLsKPTxn/Chat-GPT-Image-Nov-10-2025-10-03-23-AM.png', 'https://i.ibb.co/JF8jWx5G/Chat-GPT-Image-Nov-10-2025-10-04-20-AM.png', 'https://i.ibb.co/63XC9yZ/Chat-GPT-Image-Nov-10-2025-10-06-27-AM.png', 'https://i.ibb.co/hRpnP926/Chat-GPT-Image-Nov-10-2025-10-07-30-AM.png', 'https://i.ibb.co/S4pHBS5J/Chat-GPT-Image-Nov-10-2025-10-08-47-AM.png',
-];
+const GameCanvas: React.FC<GameCanvasProps> = ({
+  gameStateRef,
+  onSetTargetPosition,
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [canvasSize, setCanvasSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+  const [devicePixelRatio, setDevicePixelRatio] = useState(
+    window.devicePixelRatio || 1
+  );
+  const waterFxRef = useRef<WaterFX | null>(null);
+  const patternCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const groundPatternRef = useRef<CanvasPattern | null>(null);
+  const roadPatternCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const roadPatternRef = useRef<CanvasPattern | null>(null);
 
-// --- Gameplay Constants ---
-export const PLAYER_BASE_SPEED = 200; // pixels per second
-export const BASE_INVENTORY_CAP = 20;
-export const PLAYER_RADIUS = 30;
-export const COLLECTIBLE_RADIUS = 20;
-export const COLLECTIBLE_LIFESPAN = 10 * 60 * 1000; // 10 minutes
-export const COLLECTIBLE_VALUE = 0.10; // $0.10
-export const SPEED_BOOST_CHAIN_WINDOW = 5000; // ms to maintain chain
-export const SPEED_BOOST_CHAIN_THRESHOLD = 5; // items in chain to trigger boost
-export const SPEED_BOOST_BATCH_TRIGGER = 3; // items grabbed at once to trigger boost
-export const SPEED_BOOST_DURATION = 6000; // ms of boost duration
-export const SPEED_BOOST_MULTIPLIER = 1.35; // movement multiplier during boost
-export const PLAYER_MAX_HP = 100;
-export const TRAFFIC_DAMAGE = 30;
-export const NPC_SHOVE_DAMAGE = 10;
-export const CANAL_COLD_DAMAGE = 1; // per second
-export const BRIDGE_APPROACH_DISTANCE = 280; // px distance to suggest nearest bridge
-export const BRIDGE_PATH_SAMPLES = 24; // sampling resolution for bridge pathfinding
-export const BRIDGE_SNAP_PADDING = 28; // px padding when checking bridge clicks
-export const ROAD_TEXTURE_URL = 'https://i.ibb.co/s9V8fFRv/download.jpg';
-export const ROAD_TILE_SIZE = 64;
+  const [loadedImages, setLoadedImages] = useState<
+    Record<string, HTMLImageElement>
+  >({});
+  const [loadingProgress, setLoadingProgress] = useState({
+    loaded: 0,
+    total: 1,
+  });
+  const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
 
-// --- ZONES (Areas of Ottawa) ---
-export const ZONES: Zone[] = [
-  { name: 'ByWard Market', rect: [2400, 1900, 500, 500], spawnMultiplier: 1.6 },
-  { name: 'Centretown', rect: [1500, 2500, 1000, 1000], spawnMultiplier: 1.3 },
-  { name: 'The Glebe', rect: [1500, 3500, 1000, 1500], spawnMultiplier: 1.2 },
-  { name: 'Sandy Hill', rect: [2500, 2400, 1000, 1000], spawnMultiplier: 1.1 },
-  { name: 'Hintonburg', rect: [500, 2500, 1000, 1500], spawnMultiplier: 1.0 },
-  { name: 'Westboro', rect: [0, 2500, 500, 1500], spawnMultiplier: 0.8 },
-  { name: 'Little Italy', rect: [1000, 3800, 400, 800], spawnMultiplier: 1.1 },
-  { name: 'Chinatown', rect: [1000, 3000, 400, 800], spawnMultiplier: 1.1 },
-];
+  useEffect(() => {
+    const imagesToLoad = Array.from(
+      new Set([...CAN_IMAGE_URLS, CRITTER_ATLAS.image, ROAD_TEXTURE_URL])
+    );
+    let loadedCount = 0;
+    setLoadingProgress({ loaded: 0, total: imagesToLoad.length });
 
-const RIDEAU_CANAL_POLY: Vector2[] = [
-    {x: 1400, y: 1200}, {x: 1420, y: 1500}, {x: 1380, y: 2000}, {x: 1430, y: 2500},
-    {x: 1480, y: 3500}, {x: 1530, y: 4500}, {x: 1550, y: 6000}, {x: 1750, y: 6000},
-    {x: 1730, y: 4500}, {x: 1680, y: 3500}, {x: 1630, y: 2500}, {x: 1580, y: 2000},
-    {x: 1620, y: 1500}, {x: 1600, y: 1200}
-];
-
-// A proper channel for the Ottawa River
-const OTTAWA_RIVER_POLY: Vector2[] = [
-    {x: 0, y: 1100}, {x: 4000, y: 1100}, {x: 4000, y: 1250}, {x: 0, y: 1250}
-];
-
-export const WATER_BODIES: WaterBody[] = [
-    { name: 'Rideau Canal', polygon: RIDEAU_CANAL_POLY },
-    { name: 'Ottawa River', polygon: OTTAWA_RIVER_POLY }
-];
-
-export const isPointInWater = (point: Vector2): boolean => WATER_BODIES.some(wb => pointInPoly(point, wb.polygon));
-
-// --- Ontario/Quebec separation ---
-export const QUEBEC_BORDER_Y = 1120;
-export const isInQuebec = (p: Vector2) => p.y < QUEBEC_BORDER_Y;
-
-// --- World Objects ---
-export const STASH_HOUSE_POSITION: Vector2 = { x: 1800, y: 3700 }; // Centretown/Glebe border
-export const REFUND_DEPOT_POSITION: Vector2 = { x: 2350, y: 900 };   // In Gatineau
-export const KIOSK_INTERACTION_RADIUS = 150;
-
-// --- Houses ---
-const createHouseCluster = (center: Vector2, count: number, radius: number): House[] => {
-    const houses: House[] = [];
-    for (let i = 0; i < count; i++) {
-        const angle = (i / count) * 2 * Math.PI + (Math.random() - 0.5) * 0.8;
-        const distance = radius * (0.6 + Math.random() * 0.4);
-        const housePos = { x: center.x + Math.cos(angle) * distance, y: center.y + Math.sin(angle) * distance };
-        if (!isPointInWater(housePos)) houses.push({ position: housePos });
+    if (imagesToLoad.length === 0) {
+      setAllAssetsLoaded(true);
+      return;
     }
-    return houses;
-};
 
-export const HOUSES: House[] = [
-    ...createHouseCluster({ x: 1800, y: 3700 }, 6, 150), ...createHouseCluster({ x: 2100, y: 4000 }, 5, 120), ...createHouseCluster({ x: 1750, y: 4400 }, 7, 160),
-    ...createHouseCluster({ x: 2700, y: 2800 }, 8, 180), ...createHouseCluster({ x: 3100, y: 3100 }, 6, 140), ...createHouseCluster({ x: 800, y: 2900 }, 6, 160),
-    ...createHouseCluster({ x: 1100, y: 3500 }, 5, 130), ...createHouseCluster({ x: 3000, y: 1900 }, 9, 200),
-];
+    imagesToLoad.forEach((url) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = url;
+      img.onload = () => {
+        setLoadedImages((prev) => ({ ...prev, [url]: img }));
+        loadedCount++;
+        setLoadingProgress({
+          loaded: loadedCount,
+          total: imagesToLoad.length,
+        });
+        if (loadedCount === imagesToLoad.length)
+          setTimeout(() => setAllAssetsLoaded(true), 500);
+      };
+      img.onerror = () => {
+        console.error(`Failed to load image: ${url}`);
+        loadedCount++;
+        setLoadingProgress({
+          loaded: loadedCount,
+          total: imagesToLoad.length,
+        });
+        if (loadedCount === imagesToLoad.length)
+          setTimeout(() => setAllAssetsLoaded(true), 500);
+      };
+    });
+  }, []);
 
-// --- Bridges ---
-export const BRIDGES: Bridge[] = [
-  // Ottawa River Bridges (North-South)
-  { name: 'Macdonald-Cartier Bridge', nameKey: 'bridge_macdonald_cartier', from:{x:3000,y:1260}, to:{x:3000,y:1090}, rect:[2980, 1090, 40, 170] },
-  { name: 'Alexandra Bridge', nameKey: 'bridge_alexandra', from:{x:2300,y:1260}, to:{x:2300,y:1090}, rect:[2280, 1090, 40, 170], repairGag: true },
-  { name: 'Portage Bridge', nameKey: 'bridge_portage', from:{x:1800,y:1260}, to:{x:1800,y:1090}, rect:[1780, 1090, 40, 170] },
-  { name: 'Chaudière Crossing', nameKey: 'bridge_chaudiere', from:{x:1200,y:1260}, to:{x:1200,y:1090}, rect:[1180, 1090, 40, 170] },
-  { name: 'Champlain Bridge', nameKey: 'bridge_champlain', from:{x:500,y:1260}, to:{x:500,y:1090}, rect:[480, 1090, 40, 170] },
-];
+  if (!waterFxRef.current) waterFxRef.current = new WaterFX(208, true);
 
-// --- Landmarks ---
-export const LANDMARKS: Landmark[] = [
-  { nameKey:'landmark_parliament', position:{ x:1800, y:2000 }, emoji:'🏛️' },
-  { nameKey:'landmark_byward_market', position:{ x:2600, y:2200 }, emoji:'🥖' },
-  { nameKey:'landmark_national_gallery', position:{ x:2300, y:1800 }, emoji:'🖼️' },
-  { nameKey:'landmark_rideau_centre', position:{ x:2250, y:2150 }, emoji:'🛍️' },
-  { nameKey:'landmark_shaw_centre', position:{ x:2300, y:2200 }, emoji:'🏢' },
-  { nameKey:'landmark_uottawa', position:{ x:2350, y:2450 }, emoji:'🎓' },
-  { nameKey:'landmark_confederation_park', position:{ x:2000, y:2300 }, emoji:'🌳' },
-  { nameKey:'landmark_lansdowne', position:{ x:1800, y:4200 }, emoji:'🏟️' },
-  { nameKey:'landmark_dows_lake', position:{ x:1500, y:4600 }, emoji:'🛶' },
-  { nameKey:'landmark_little_italy', position:{ x:1450, y:4100 }, emoji:'🍝' },
-  { nameKey:'landmark_hintonburg', position:{ x: 800, y:2900 }, emoji:'☕' },
-  { nameKey:'landmark_westboro', position:{ x: 300, y:2800 }, emoji:'🛍️' },
-  { nameKey:'landmark_war_museum', position:{ x:1400, y:2050 }, emoji:'🪖' },
-  { nameKey:'landmark_supreme_court', position:{ x:1600, y:2050 }, emoji:'⚖️' },
-  { nameKey:'landmark_chateau_laurier', position:{ x:2150, y:2100 }, emoji:'🏰' },
-  { nameKey:'landmark_chinatown', position:{ x:1200, y:3000 }, emoji:'🏮' },
-  { nameKey:'landmark_glebe', position:{ x:1850, y:3800 }, emoji:'🏘️' },
-  { nameKey:'landmark_tunneys_pasture', position:{ x: 800, y:2500 }, emoji:'🏢' },
-  { nameKey:'landmark_bayview', position:{ x:1100, y:2550 }, emoji:'🚉' },
-  { nameKey:'landmark_pimisi', position:{ x:1300, y:2350 }, emoji:'🚉' },
-  { nameKey:'landmark_history_museum', position:{ x:2350, y:950 }, emoji:'🏛️' },
-  { nameKey:'landmark_jacques_cartier_park', position:{ x:2600, y:900 }, emoji:'🌲' },
-];
+  const worldToScreen = (
+    pos: Vector2,
+    camera: Vector2,
+    canvasDim: { width: number; height: number }
+  ): Vector2 => ({
+    x: pos.x - camera.x + canvasDim.width / 2,
+    y: pos.y - camera.y + canvasDim.height / 2,
+  });
+  const screenToWorld = (
+    pos: Vector2,
+    camera: Vector2,
+    canvasDim: { width: number; height: number }
+  ): Vector2 => ({
+    x: pos.x + camera.x - canvasDim.width / 2,
+    y: pos.y + camera.y - canvasDim.height / 2,
+  });
 
-// --- Foliage & Clutter ---
-const isNearLandmark = (p: Vector2, r=80) => LANDMARKS.some(lm => Math.hypot(p.x - lm.position.x, p.y - lm.position.y) < r);
-const generateClutter = (count: number, emoji: string, seed: number, type: Foliage['type'] = 'other'): Foliage[] => {
-    const rng = mulberry32(seed);
-    const out: Foliage[] = [];
-    for (let i = 0; i < count; i++) {
-        const p = { x: rand2(rng, 0, GAME_WORLD_SIZE.width), y: rand2(rng, 0, GAME_WORLD_SIZE.height) };
-        if (!isPointInWater(p) && !isNearLandmark(p, 60)) {
-            out.push({ type, position: p, emoji, variant: 0 });
+  useEffect(() => {
+    const handleResize = () => {
+      setCanvasSize({ width: window.innerWidth, height: window.innerHeight });
+      setDevicePixelRatio(window.devicePixelRatio || 1);
+    };
+    window.addEventListener('resize', handleResize);
+    const mediaQuery = window.matchMedia(
+      `(resolution: ${window.devicePixelRatio || 1}dppx)`
+    );
+    const handleDprChange = () =>
+      setDevicePixelRatio(window.devicePixelRatio || 1);
+    if (mediaQuery.addEventListener)
+      mediaQuery.addEventListener('change', handleDprChange);
+    else if (mediaQuery.addListener)
+      mediaQuery.addListener(handleDprChange);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (mediaQuery.removeEventListener)
+        mediaQuery.removeEventListener('change', handleDprChange);
+      else if (mediaQuery.removeListener)
+        mediaQuery.removeListener(handleDprChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = devicePixelRatio;
+    canvas.width = Math.floor(canvasSize.width * dpr);
+    canvas.height = Math.floor(canvasSize.height * dpr);
+    canvas.style.width = `${canvasSize.width}px`;
+    canvas.style.height = `${canvasSize.height}px`;
+    roadPatternRef.current = null;
+  }, [canvasSize, devicePixelRatio]);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const x = e.clientX - (rect?.left ?? 0);
+    const y = e.clientY - (rect?.top ?? 0);
+    onSetTargetPosition(
+      screenToWorld({ x, y }, gameStateRef.current.camera, canvasSize)
+    );
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const ensureGroundPattern = () => {
+      if (!patternCanvasRef.current) {
+        const patternCanvas = document.createElement('canvas');
+        patternCanvas.width = patternCanvas.height = 256;
+        const pctx = patternCanvas.getContext('2d');
+        if (pctx) {
+          const gradient = pctx.createLinearGradient(0, 0, 256, 256);
+          gradient.addColorStop(0, '#a7c9a2');
+          gradient.addColorStop(1, '#8fb588');
+          pctx.fillStyle = gradient;
+          pctx.fillRect(0, 0, 256, 256);
+          pctx.fillStyle = 'rgba(255,255,255,0.05)';
+          for (let i = 0; i < 140; i++) {
+            const size = 1 + Math.random() * 3;
+            pctx.beginPath();
+            pctx.arc(
+              Math.random() * 256,
+              Math.random() * 256,
+              size,
+              0,
+              Math.PI * 2
+            );
+            pctx.fill();
+          }
+          pctx.strokeStyle = 'rgba(70, 102, 70, 0.15)';
+          for (let i = 0; i < 8; i++) {
+            pctx.beginPath();
+            pctx.moveTo(Math.random() * 256, Math.random() * 256);
+            pctx.lineTo(Math.random() * 256, Math.random() * 256);
+            pctx.stroke();
+          }
         }
-    }
-    return out;
+        patternCanvasRef.current = patternCanvas;
+      }
+      if (patternCanvasRef.current && !groundPatternRef.current) {
+        groundPatternRef.current = ctx.createPattern(
+          patternCanvasRef.current,
+          'repeat'
+        );
+      }
+      return groundPatternRef.current;
+    };
+
+    const ensureRoadPattern = () => {
+      const roadImage = loadedImages[ROAD_TEXTURE_URL];
+      if (!roadImage) return null;
+      if (!roadPatternCanvasRef.current) {
+        const tileCanvas = document.createElement('canvas');
+        tileCanvas.width = tileCanvas.height = ROAD_TILE_SIZE;
+        const tileCtx = tileCanvas.getContext('2d');
+        if (tileCtx) {
+          tileCtx.drawImage(roadImage, 0, 0, ROAD_TILE_SIZE, ROAD_TILE_SIZE);
+        }
+        roadPatternCanvasRef.current = tileCanvas;
+        roadPatternRef.current = null;
+      }
+      if (!roadPatternCanvasRef.current) return null;
+      if (!roadPatternRef.current) {
+        roadPatternRef.current = ctx.createPattern(
+          roadPatternCanvasRef.current,
+          'repeat'
+        );
+      }
+      return roadPatternRef.current;
+    };
+
+    let animationFrameId: number;
+
+    const render = (time: number) => {
+      const gameState = gameStateRef.current;
+      if (!gameState) {
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
+      const {
+        camera,
+        player,
+        refundDepot,
+        stashHouse,
+        waterBodies,
+        bridges,
+        landmarks,
+        foliage,
+        floatingTexts,
+        clickMarkers,
+        critters,
+        language,
+        traffic,
+        npcs,
+        crosswalks,
+        dialogue,
+        closestBridge,
+      } = gameState;
+      const dpr = devicePixelRatio;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+
+      const pattern = ensureGroundPattern();
+      ctx.fillStyle = pattern || '#a1c099';
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+
+      const CULL_MARGIN = 100;
+      const viewBounds = {
+        left: camera.x - canvasSize.width / 2 - CULL_MARGIN,
+        right: camera.x + canvasSize.width / 2 + CULL_MARGIN,
+        top: camera.y - canvasSize.height / 2 - CULL_MARGIN,
+        bottom: camera.y + canvasSize.height / 2 + CULL_MARGIN,
+      };
+
+      const waterFx = waterFxRef.current!;
+      waterBodies.forEach((wb) => {
+        waterFx.drawWaterBody(ctx, wb.polygon, camera, canvasSize, time);
+      });
+
+      const roadPattern = ensureRoadPattern();
+      const roadFillStyle: CanvasPattern | string =
+        roadPattern ?? '#575757';
+      ROADS.forEach((road) => {
+        const minX = Math.min(road.from.x, road.to.x) - road.width / 2;
+        const maxX = Math.max(road.from.x, road.to.x) + road.width / 2;
+        const minY = Math.min(road.from.y, road.to.y) - road.width / 2;
+        const maxY = Math.max(road.from.y, road.to.y) + road.width / 2;
+        if (
+          maxX < viewBounds.left ||
+          minX > viewBounds.right ||
+          maxY < viewBounds.top ||
+          minY > viewBounds.bottom
+        ) {
+          return;
+        }
+        const startScreen = worldToScreen(road.from, camera, canvasSize);
+        const endScreen = worldToScreen(road.to, camera, canvasSize);
+        const dx = endScreen.x - startScreen.x;
+        const dy = endScreen.y - startScreen.y;
+        const length = Math.hypot(dx, dy);
+        if (length < 1) return;
+        const angle = Math.atan2(dy, dx);
+        ctx.save();
+        ctx.translate(startScreen.x, startScreen.y);
+        ctx.rotate(angle);
+        ctx.fillStyle = roadFillStyle;
+        ctx.fillRect(0, -road.width / 2, length, road.width);
+        ctx.strokeStyle = 'rgba(25,25,25,0.8)';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(0, -road.width / 2, length, road.width);
+        const isBridgeRoad = road.id.startsWith('bridge_');
+        if (!isBridgeRoad) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([18, 20]);
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(length, 0);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,0.08)';
+          ctx.fillRect(0, -road.width / 2, length, road.width);
+        }
+        ctx.restore();
+      });
+
+      ctx.save();
+      const vignette = ctx.createLinearGradient(
+        0,
+        0,
+        0,
+        canvasSize.height
+      );
+      vignette.addColorStop(0, 'rgba(0,0,0,0.18)');
+      vignette.addColorStop(0.3, 'rgba(0,0,0,0)');
+      vignette.addColorStop(0.7, 'rgba(0,0,0,0)');
+      vignette.addColorStop(1, 'rgba(0,0,0,0.28)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+      ctx.restore();
+
+      const borderY = QUEBEC_BORDER_Y;
+      if (borderY > viewBounds.top && borderY < viewBounds.bottom) {
+        const borderStartScreen = worldToScreen(
+          { x: -100, y: borderY },
+          camera,
+          canvasSize
+        );
+        const borderEndScreen = worldToScreen(
+          { x: GAME_WORLD_SIZE.width + 100, y: borderY },
+          camera,
+          canvasSize
+        );
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(borderStartScreen.x, borderStartScreen.y);
+        ctx.lineTo(borderEndScreen.x, borderEndScreen.y);
+        ctx.setLineDash([20, 15]);
+        ctx.lineDashOffset = -(time / 100);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255, 223, 0, 0.8)';
+        ctx.shadowColor = 'rgba(255, 223, 0, 1)';
+        ctx.shadowBlur = 15;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Render bridges
+      bridges.forEach((b) => {
+        const { x, y } = worldToScreen(
+          { x: b.rect[0], y: b.rect[1] },
+          camera,
+          canvasSize
+        );
+        const width = b.rect[2];
+        const height = b.rect[3];
+        ctx.save();
+        if (roadPattern) {
+          ctx.fillStyle = roadPattern;
+          ctx.fillRect(x, y, width, height);
+        } else {
+          ctx.fillStyle = b.repairGag
+            ? 'rgba(80, 60, 60, 0.85)'
+            : 'rgba(92, 92, 92, 0.85)';
+          ctx.fillRect(x, y, width, height);
+        }
+        ctx.strokeStyle = 'rgba(34,34,34,0.9)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, width, height);
+        ctx.fillStyle = b.repairGag
+          ? 'rgba(142,72,72,0.25)'
+          : 'rgba(255,255,255,0.08)';
+        ctx.fillRect(x, y, width, height);
+        ctx.restore();
+      });
+
+      if (closestBridge) {
+        const [bx, by, bw, bh] = closestBridge.rect;
+        const topLeft = worldToScreen(
+          { x: bx, y: by },
+          camera,
+          canvasSize
+        );
+        const bottomRight = worldToScreen(
+          { x: bx + bw, y: by + bh },
+          camera,
+          canvasSize
+        );
+        const width = bottomRight.x - topLeft.x;
+        const height = bottomRight.y - topLeft.y;
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.12)';
+        ctx.fillRect(topLeft.x, topLeft.y, width, height);
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 6]);
+        ctx.strokeRect(topLeft.x, topLeft.y, width, height);
+        ctx.restore();
+
+        ctx.save();
+        const labelWidth = Math.min(360, canvasSize.width - 40);
+        const labelX = (canvasSize.width - labelWidth) / 2;
+        const labelY = 20;
+        ctx.fillStyle = 'rgba(12, 20, 12, 0.65)';
+        ctx.fillRect(labelX, labelY, labelWidth, 48);
+        ctx.fillStyle = '#FFE27A';
+        ctx.font = '600 16px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const bridgeName = closestBridge.nameKey
+          ? t(closestBridge.nameKey, language)
+          : closestBridge.name;
+        ctx.fillText(
+          `${t('bridge_label', language)}: ${bridgeName}`,
+          labelX + labelWidth / 2,
+          labelY + 24
+        );
+        ctx.restore();
+      }
+
+      crosswalks.forEach((cw) => {
+        /* ... crosswalk drawing ... */
+      });
+
+      [...landmarks, ...foliage, ...gameState.collectibles].forEach(
+        (obj) => {
+          if (
+            obj.position.x < viewBounds.left ||
+            obj.position.x > viewBounds.right ||
+            obj.position.y < viewBounds.top ||
+            obj.position.y > viewBounds.bottom
+          )
+            return;
+          const { x, y } = worldToScreen(
+            obj.position,
+            camera,
+            canvasSize
+          );
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+
+          // Prioritize images over emojis, and handle optional emojis safely.
+          if ('imageUrl' in obj && obj.imageUrl) {
+            const img = loadedImages[obj.imageUrl];
+            if (img) {
+              const drawHeight = 48;
+              const aspectRatio = img.width / img.height;
+              const drawWidth = drawHeight * aspectRatio;
+              ctx.drawImage(
+                img,
+                x - drawWidth / 2,
+                y - drawHeight,
+                drawWidth,
+                drawHeight
+              );
+            }
+          } else if ('emoji' in obj && obj.emoji) {
+            ctx.font =
+              'type' in obj && obj.type === 'other'
+                ? '24px sans-serif'
+                : '36px sans-serif';
+            ctx.fillText(obj.emoji, x, y);
+          }
+
+          if ('nameKey' in obj && obj.nameKey) {
+            ctx.font = '8pt Arial';
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            const text = t(obj.nameKey as string, language);
+            ctx.strokeText(text, x, y + 14);
+            ctx.fillText(text, x, y + 14);
+          }
+        }
+      );
+
+      const pathTargets: Vector2[] = [];
+      if (player.targetPosition) pathTargets.push(player.targetPosition);
+      if (player.pathQueue.length) pathTargets.push(...player.pathQueue);
+      if (pathTargets.length) {
+        const startPos = worldToScreen(
+          player.position,
+          camera,
+          canvasSize
+        );
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath();
+        ctx.moveTo(startPos.x, startPos.y);
+        pathTargets.forEach((pt) => {
+          const p = worldToScreen(pt, camera, canvasSize);
+          ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
+      [...traffic, ...npcs].forEach((e) => {
+        if (
+          e.position.x < viewBounds.left ||
+          e.position.x > viewBounds.right ||
+          e.position.y < viewBounds.top ||
+          e.position.y > viewBounds.bottom
+        )
+          return;
+        const { x, y } = worldToScreen(
+          e.position,
+          camera,
+          canvasSize
+        );
+        ctx.font = '36px sans-serif';
+        ctx.fillText(e.emoji, x, y);
+      });
+
+      const depotScreenPos = worldToScreen(
+        refundDepot,
+        camera,
+        canvasSize
+      );
+      ctx.font = '80px sans-serif';
+      ctx.fillText('🏪', depotScreenPos.x, depotScreenPos.y);
+      const stashScreenPos = worldToScreen(
+        stashHouse,
+        camera,
+        canvasSize
+      );
+      ctx.font = '80px sans-serif';
+      ctx.fillText('📦', stashScreenPos.x, stashScreenPos.y);
+
+      gameState.houses.forEach((h) => {
+        if (
+          h.position.x < viewBounds.left ||
+          h.position.x > viewBounds.right ||
+          h.position.y < viewBounds.top ||
+          h.position.y > viewBounds.bottom
+        )
+          return;
+        const { x, y } = worldToScreen(
+          h.position,
+          camera,
+          canvasSize
+        );
+        ctx.font = '64px sans-serif';
+        ctx.fillText('🏠', x, y);
+      });
+
+      const playerScreenPos = worldToScreen(
+        player.position,
+        camera,
+        canvasSize
+      );
+      if (player.speedBoostTimer > 0) {
+        const boostRatio = Math.min(
+          1,
+          player.speedBoostTimer / SPEED_BOOST_DURATION
+        );
+        ctx.save();
+        ctx.globalAlpha = 0.35 + 0.15 * Math.sin(time / 120);
+        ctx.fillStyle = 'rgba(255, 224, 102, 0.55)';
+        ctx.beginPath();
+        ctx.arc(
+          playerScreenPos.x,
+          playerScreenPos.y - 12,
+          38 + boostRatio * 24,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+        ctx.restore();
+      }
+      if (player.isInvulnerable && Math.floor(time / 100) % 2 === 0) {
+        /* don't draw player */
+      } else {
+        ctx.font = '48px sans-serif';
+        ctx.fillText(
+          player.upgrades.has('bicycle') ? '🚴' : '🧍',
+          playerScreenPos.x,
+          playerScreenPos.y
+        );
+        const hpBarWidth = 40;
+        const hpBarHeight = 5;
+        const hpBarX = playerScreenPos.x - hpBarWidth / 2;
+        const hpBarY = playerScreenPos.y - 55;
+        ctx.fillStyle = '#333';
+        ctx.fillRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight);
+        ctx.fillStyle =
+          player.hp / player.maxHp > 0.3 ? '#7CFC00' : '#FF4500';
+        ctx.fillRect(
+          hpBarX,
+          hpBarY,
+          hpBarWidth * (player.hp / player.maxHp),
+          hpBarHeight
+        );
+      }
+
+      if (closestBridge) {
+        const angle = Math.atan2(
+          closestBridge.from.y - player.position.y,
+          closestBridge.from.x - player.position.x
+        );
+        ctx.save();
+        ctx.translate(playerScreenPos.x, playerScreenPos.y - 60);
+        ctx.rotate(angle + Math.PI / 2);
+        ctx.font = '24px sans-serif';
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.9)';
+        ctx.textAlign = 'center';
+        ctx.fillText('🔽', 0, 0);
+        ctx.font = 'bold 10pt Arial';
+        ctx.fillText(t('bridge_label', language), 0, 20);
+        ctx.restore();
+      }
+
+      floatingTexts.forEach((text) => {
+        const { x, y } = worldToScreen(
+          text.position,
+          camera,
+          canvasSize
+        );
+        ctx.save();
+        ctx.font = 'bold 18px sans-serif';
+        ctx.globalAlpha = Math.max(0, text.life);
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(text.text, x, y);
+        ctx.fillStyle = text.color;
+        ctx.fillText(text.text, x, y);
+        ctx.restore();
+      });
+
+      clickMarkers.forEach((marker) => {
+        const { x, y } = worldToScreen(
+          marker.position,
+          camera,
+          canvasSize
+        );
+        ctx.globalAlpha = marker.life;
+        ctx.strokeStyle = '#FFFF00';
+        ctx.lineWidth = 2;
+        const size = 10;
+        ctx.beginPath();
+        ctx.moveTo(x - size, y);
+        ctx.lineTo(x + size, y);
+        ctx.moveTo(x, y - size);
+        ctx.lineTo(x, y + size);
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+      });
+
+      dialogue.forEach((bubble) =>
+        drawChatBubble(ctx, bubble, camera, canvasSize)
+      );
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    animationFrameId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [gameStateRef, canvasSize, onSetTargetPosition, loadedImages, devicePixelRatio]);
+
+  return (
+    <>
+      <canvas
+        ref={canvasRef}
+        width={canvasSize.width}
+        height={canvasSize.height}
+        className="absolute top-0 left-0 w-full h-full cursor-pointer"
+        onPointerDown={handlePointerDown}
+      />
+      {!allAssetsLoaded && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-1/2 max-w-sm pointer-events-none">
+          <p className="text-white text-center text-sm text-outline">
+            {t(
+              'loading_assets',
+              gameStateRef.current?.language || 'en'
+            )}
+          </p>
+          <div className="w-full bg-gray-600 rounded-full h-2.5 mt-1 border-2 border-white/50">
+            <div
+              className="bg-yellow-400 h-1.5 rounded-full"
+              style={{
+                width: `${
+                  (loadingProgress.loaded / loadingProgress.total) *
+                  100
+                }%`,
+                transition: 'width 0.2s',
+              }}
+            ></div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 };
-export const FOLIAGE: Foliage[] = [
-    ...generateClutter(120, '🌳', 1, 'tree'),
-    ...generateClutter(90, '🌲', 11, 'tree'),
-    ...generateClutter(150, '🌿', 2, 'bush'),
-    ...generateClutter(60, '🌾', 12, 'bush'),
-    ...generateClutter(40, '🌼', 5, 'other'),
-    ...generateClutter(24, '🪨', 6, 'other'),
-    ...generateClutter(20, '🪑', 3, 'other'),
-    ...generateClutter(18, '💡', 4, 'other'),
-    ...generateClutter(28, '🍁', 7, 'other'),
-    // Winterlude features
-    ...[{position: {x: 1700, y: 4100}, emoji: '🥨', type: 'other', variant: 0} as Foliage, {position: {x: 1450, y: 2800}, emoji: '🥨', type: 'other', variant: 0} as Foliage]
-];
 
-// --- Traffic ---
-export const TRAFFIC_PATHS = [
-    [{ x: 1850, y: 1200 }, { x: 1850, y: 3100 }], // Elgin St
-    [{ x: 1200, y: 2100 }, { x: 2600, y: 2100 }], // Wellington St
-    [{ x: 1250, y: 3000 }, { x: 1250, y: 4500 }], // Bronson Ave
-    [{ x: 100, y: 2850 }, { x: 1000, y: 2850 }], // Wellington West
-];
-
-export const ROADS: RoadSegment[] = [
-    { id: 'elgin', from: { x: 1850, y: 1200 }, to: { x: 1850, y: 5000 }, width: 150 },
-    { id: 'wellington', from: { x: 800, y: 2100 }, to: { x: 3200, y: 2100 }, width: 160 },
-    { id: 'bronson', from: { x: 1250, y: 2600 }, to: { x: 1250, y: 5200 }, width: 150 },
-    { id: 'bank', from: { x: 1750, y: 1800 }, to: { x: 1750, y: 5200 }, width: 140 },
-    { id: 'sussex', from: { x: 2400, y: 1400 }, to: { x: 2400, y: 2600 }, width: 120 },
-    { id: 'rideau', from: { x: 2100, y: 2300 }, to: { x: 2800, y: 2300 }, width: 140 },
-    { id: 'bridge_macdonald_cartier', from: { x: 3000, y: 1500 }, to: { x: 3000, y: 900 }, width: 130 },
-    { id: 'bridge_portage', from: { x: 1800, y: 1500 }, to: { x: 1800, y: 900 }, width: 130 },
-    { id: 'bridge_chaudiere', from: { x: 1200, y: 1500 }, to: { x: 1200, y: 900 }, width: 130 },
-    { id: 'bridge_champlain', from: { x: 500, y: 1600 }, to: { x: 500, y: 900 }, width: 140 },
-];
-export const CROSSWALKS: Crosswalk[] = [
-    { position: { x: 1850, y: 2500 }, rect: [1820, 2480, 60, 40], active: false, timer: 0 },
-    { position: { x: 2200, y: 2100 }, rect: [2170, 2080, 60, 40], active: false, timer: 0 },
-];
-
-// --- NPCs ---
-export const NPC_SPAWNS = [
-    { type: 'security' as const, pos: { x: 2200, y: 2180 } }, // By Rideau Centre
-    { type: 'security' as const, pos: { x: 1750, y: 2100 } }, // Near Parliament
-    { type: 'complainer' as const, pos: { x: 1900, y: 3900 } }, // In The Glebe
-    { type: 'general' as const, pos: { x: 2550, y: 2250 } }, // Byward Market
-    { type: 'general' as const, pos: { x: 1700, y: 2800 } }, // Centretown
-    { type: 'general' as const, pos: { x: 2500, y: 850 } }, // Gatineau
-    { type: 'general' as const, pos: { x: 2200, y: 1000 } }, // Gatineau
-];
-export const BARKS_GENERAL = [
-  "Careful, bud—this sidewalk’s pure slush.", "Ten cents a can? You’ll be rollin’ in loonies, eh.", "Mind the LRT… or, uh, the shuttle bus of destiny.", "If you see a beavertails stand, grab me a Killaloe Sunrise.", "ByWard’s that way; follow the tourists with mittens.", "Skating the Canal later? Watch for rough ice by the lights.", "Tulips pop soon—Commissioners Park goes nuts.", "Bank Street traffic’ll chirp you; keep right.", "Westboro? Fancy cans there—sparkly recyclables.", "Hintonburg hipsters tip better—true story.", "Rideau Centre cans vanish fast—mall guards on patrol.", "Watch your toes—salt chunks like meteorites.", "Double-double power-up at Timmy’s, two blocks south.", "Bluesfest nights = can jackpot, bring earplugs.", "Sparks Street patios spawn cans like loot drops.", "Carleton kids dump a motherlode after exams.", "uOttawa rez night? Inventory full in five.", "Don’t slip—black ice is Canada’s final boss.", "NCC says keep the Canal clean, champ.", "That bridge? Detour city—Alexandra’s always ‘under repair’.", "Elgin after 11: poutine in one hand, cans in the other.", "Chaudière winds will yeet your toque, careful.", "Mooney’s Bay is chill til the dragon boats show.", "Glebe garage sales = premium aluminum.", "Tunney’s Pasture… more like Tunney’s Tupperware at lunch.", "Lebreton construction: cans in, exits out.", "Chinatown late night—pho, pop cans, prosperity.", "Little Italy? Bring extra bags, nonna parties hard.", "Portage Bridge puffs—hold your hat, pal.", "Sandy Hill porches = bonus spawns after Friday.", "Sparks buskers = coin sounds, can sounds—music.", "Rideau Falls mist = soggy socks. Proceed with pride.", "Museum nights: fewer people, cleaner loot.", "Parliament selfies + energy drinks = tidy profit.", "Elgin bike lanes—don’t be that guy.", "Winterlude time? Cans freeze to the snowbank.", "Bayview transfer—commuters abandon bubbly by the dozen.", "Pimisi station? Watch for scooters and suits.", "Gatineau folks cross for shawarma; follow the garlic.", "Sparks pop-ups: artisanal soda = artisanal cans.", "Supreme Court steps: great view, mid cans.", "War Museum lawn—quiet, sneaky good on weekends.", "Rockcliffe dog walkers—tinny bell equals tins, eh.", "Hogs Back roar means you’re close to splash zone.", "Arboretum shade: cool cans, cooler squirrels.", "St. Laurent big box = cart city, can city.", "Weather app says ‘flurries’; Ottawa says blizzard.", "If it sparkles, it’s probably recyclable—probably.", "Got a cart upgrade? Your back will thank you.", "Hydro bill high? Pick more cans, become legend.",
-];
-export const BARKS_POLICE = [
-  "Hey friend—sidewalk stays clear, collect from the curb, ok?", "Mind the tracks; LRT fines aren’t worth a nickel.", "Helmet on if you’re biking that load—bylaw’s a thing.", "No trespassing behind the Beer Store—use the public bins.", "All good—just don’t block the crosswalk, champ.", "Storm’s coming—plows need space. Keep to the right.", "That’s private property; stick to the city cans, please.", "Quick heads-up: bridge detour ahead, use the marked lane.", "Littering ticket’s no fun; bag it and you’re golden.", "Can count’s impressive—watch your back on Bank Street.", "Stay out of the Canal—rescues are pricey.", "You’re good to go—thanks for keeping the city tidy.",
-];
-export const BARKS_QC = [
-  "Ben voyons, t’as une brouette? T’es en affaires, là.", "Va au dép—les canettes sortent vite après souper.", "Fais pas le fatigant, le char passe au coin, tsé.", "C’est slick icitte—tes bottes vont maganer.", "Deux-trois piasse en canettes, ça paye la poutine.", "T’es ben en forme, mon chum—ça ramasse en tabar… euh, pas mal!", "Le pont shake au vent—tiens ta tuque, là.", "Au parc Jacques-Cartier, y’en a plein après les shows.", "Prends le côté du dépanneur, c’est moins rush.", "Ouin, l’OTRAIN? Mieux à pied, mon vieux.", "Ça sent la sauce brune—laisse pas tes sacs traîner.", "T’es rendu dans Hull, mon ami—bienvenue, fais ça smooth.",
-];
-
-
-// --- Critters ---
-export const CRITTER_ATLAS = { "image": "https://i.ibb.co/b3h7B5S/critters-atlas.png", "frames": { "cat_idle_0": { "x": 0, "y": 0, "w": 24, "h": 24 }, "cat_idle_1": { "x": 24, "y": 0, "w": 24, "h": 24 }, "cat_walk_0": { "x": 48, "y": 0, "w": 24, "h": 24 }, "cat_walk_1": { "x": 72, "y": 0, "w": 24, "h": 24 }, "cat_walk_2": { "x": 96, "y": 0, "w": 24, "h": 24 }, "cat_walk_3": { "x": 120,"y": 0, "w": 24, "h": 24 }, "pigeon_idle_0": { "x": 0, "y": 24, "w": 24, "h": 24 }, "pigeon_idle_1": { "x": 24, "y": 24, "w": 24, "h": 24 }, "pigeon_walk_0": { "x": 48, "y": 24, "w": 24, "h": 24 }, "pigeon_walk_1": { "x": 72, "y": 24, "w": 24, "h": 24 }, "pigeon_walk_2": { "x": 96, "y": 24, "w": 24, "h": 24 }, "pigeon_walk_3": { "x": 120,"y": 24, "w": 24, "h": 24 } }, "anims": { "cat_idle": ["cat_idle_0", "cat_idle_1"], "cat_walk": ["cat_walk_0", "cat_walk_1", "cat_walk_2", "cat_walk_3"], "pigeon_idle":["pigeon_idle_0", "pigeon_idle_1"], "pigeon_walk":["pigeon_walk_0", "pigeon_walk_1", "pigeon_walk_2", "pigeon_walk_3"] } };
-export const CRITTER_WALK_DUR = [2.5, 4.0]; export const CRITTER_IDLE_DUR = [1.5, 3.0]; export const CRITTER_FPS_IDLE = 2; export const CRITTER_FPS_WALK = 7; export const CRITTER_TURN_MAX = Math.PI / 6; export const CRITTER_UPDATE_RATE = 5; export const CRITTER_AVOID_WATER = true;
-export const CRITTER_SPAWNS = [ { kind: 'pigeon' as const, pos: { x: 1810, y: 2050 } }, { kind: 'pigeon' as const, pos: { x: 2600, y: 2200 } } ];
-
-// --- Upgrades ---
-export const UPGRADES: Record<UpgradeId, Upgrade> = {
-  bag: { id: 'bag', nameKey: 'upgrade_bag_name', descriptionKey: 'upgrade_bag_desc', cost: 25, emoji: '🎒', apply: (s: PlayerState) => ({ inventoryCap: s.inventoryCap + 20 }) },
-  cart: { id: 'cart', nameKey: 'upgrade_cart_name', descriptionKey: 'upgrade_cart_desc', cost: 100, emoji: '🛒', apply: (s: PlayerState) => ({ inventoryCap: s.inventoryCap + 50 }) },
-  bell: { id: 'bell', nameKey: 'upgrade_shoes_name', descriptionKey: 'upgrade_shoes_desc', cost: 75, emoji: '👟', apply: (s: PlayerState) => ({ speed: s.speed * 1.5 }) },
-  bicycle: { id: 'bicycle', nameKey: 'upgrade_bicycle_name', descriptionKey: 'upgrade_bicycle_desc', cost: 150, emoji: '🚲', apply: (s: PlayerState) => ({ speed: s.speed * 1.35, inventoryCap: s.inventoryCap + 10 }) },
-  bikeTrailer: { id: 'bikeTrailer', nameKey: 'upgrade_bikeTrailer_name', descriptionKey: 'upgrade_bikeTrailer_desc', cost: 200, emoji: '🚲', requires: 'bicycle', apply: (s: PlayerState) => ({ inventoryCap: s.inventoryCap + 60, speed: s.speed * 0.95 }) },
-  parka: { id: 'parka', nameKey: 'upgrade_parka_name', descriptionKey: 'upgrade_parka_desc', cost: 120, emoji: '🧥', apply: (s: PlayerState) => s },
-  otrain: { id: 'otrain', nameKey: 'upgrade_otrain_name', descriptionKey: 'upgrade_otrain_desc', cost: 500, emoji: '🚆', apply: (s: PlayerState) => s },
-  map: { id: 'map', nameKey: 'upgrade_map_name', descriptionKey: 'upgrade_map_desc', cost: 100, emoji: '🗺️', apply: (s: PlayerState) => s },
-  vest: { id: 'vest', nameKey: 'upgrade_vest_name', descriptionKey: 'upgrade_vest_desc', cost: 300, emoji: '🦺', apply: (s: PlayerState) => s },
-};
-
-// --- Quests ---
-export const QUESTS: Quest[] = [
-  { id: 1, descriptionKey: 'quest_1_desc', targetZone: null, targetCount: 20, reward: 10, progress: 0 },
-  { id: 2, descriptionKey: 'quest_2_desc', targetZone: 'ByWard Market', targetCount: 30, reward: 25, progress: 0 },
-  { id: 3, descriptionKey: 'quest_3_desc', targetZone: null, targetCount: 50, reward: 50, progress: 0 },
-  { id: 4, descriptionKey: 'quest_4_desc', targetZone: null, targetCount: 100, reward: 75, progress: 0 },
-  { id: 5, descriptionKey: 'quest_5_desc', targetZone: 'The Glebe', targetCount: 40, reward: 60, progress: 0 },
-];
+export default GameCanvas;
