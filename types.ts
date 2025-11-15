@@ -48,18 +48,30 @@ export interface Quest {
 export interface PlayerState {
   position: Vector2;
   targetPosition: Vector2 | null;
+  pathQueue: Vector2[];
   speed: number;
+  velocity: Vector2;
   inventory: Collectible[];
   inventoryCap: number;
   money: number;
   upgrades: Set<UpgradeId>;
   hasCollectedFirstCan: boolean;
+  speedBoostTimer: number;
+  collectChain: number;
+  lastCollectTime: number;
   hp: number;
   maxHp: number;
   stash: Collectible[];
   stashCap: number;
   isInvulnerable: boolean;
   invulnerableTimer: number;
+}
+
+export interface RoadSegment {
+  id: string;
+  from: Vector2;
+  to: Vector2;
+  width: number;
 }
 
 export type WaterBody = {
@@ -222,4 +234,5 @@ export interface UIState {
     hasCollectedFirstCan: boolean;
     isInventoryFull: boolean;
     purchasedUpgrades: Set<UpgradeId>;
+    speedBoostTimer: number;
 }

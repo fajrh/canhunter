@@ -1,6 +1,6 @@
 {
   "name": "can-hunter-ottawa",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A mobile-first HTML5 game where you wander Ottawa collecting cans and bottles for cash.",
   "main": "server.js",
   "type": "module",

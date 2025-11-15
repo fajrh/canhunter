@@ -1,10 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, MutableRefObject } from 'react';
 import type { GameState, PlayerState, Collectible, Vector2, UpgradeId, Quest, Critter, CritterKind, Bridge, FloatingText, Language, TrafficVehicle, NPC, ChatBubble, NPCType, UIState, Zone } from '../types.ts';
 import {
   REFUND_DEPOT_POSITION, STASH_HOUSE_POSITION, KIOSK_INTERACTION_RADIUS, PLAYER_BASE_SPEED, BASE_INVENTORY_CAP,
   PLAYER_RADIUS, COLLECTIBLE_RADIUS, COLLECTIBLE_LIFESPAN, COLLECTIBLE_VALUE, ZONES, UPGRADES, QUESTS,
-  HOUSES, WATER_BODIES, BRIDGES, LANDMARKS, CAN_IMAGE_URLS, FOLIAGE, MAX_COLLECTIBLES, isPointInWater,
-  CRITTER_SPAWNS, QUEBEC_BORDER_Y, isInQuebec, PLAYER_MAX_HP, TRAFFIC_PATHS, TRAFFIC_DAMAGE, NPC_SPAWNS, NPC_SHOVE_DAMAGE, CANAL_COLD_DAMAGE, CROSSWALKS, BARKS_GENERAL, BARKS_POLICE, BARKS_QC
+  HOUSES, WATER_BODIES, BRIDGES, LANDMARKS, CAN_IMAGE_URLS, FOLIAGE, MAX_COLLECTIBLES, INITIAL_COLLECTIBLE_TARGET, isPointInWater,
+  CRITTER_SPAWNS, QUEBEC_BORDER_Y, isInQuebec, PLAYER_MAX_HP, TRAFFIC_PATHS, TRAFFIC_DAMAGE, NPC_SPAWNS, NPC_SHOVE_DAMAGE,
+  CANAL_COLD_DAMAGE, CROSSWALKS, BARKS_GENERAL, BARKS_POLICE, BARKS_QC, SPEED_BOOST_CHAIN_THRESHOLD,
+  SPEED_BOOST_CHAIN_WINDOW, SPEED_BOOST_BATCH_TRIGGER, SPEED_BOOST_DURATION, SPEED_BOOST_MULTIPLIER,
+  BRIDGE_APPROACH_DISTANCE, BRIDGE_PATH_SAMPLES, BRIDGE_SNAP_PADDING, GAME_WORLD_SIZE
 } from '../constants.ts';
 import { audioService } from '../services/audioService.ts';
 import { saveService } from '../services/saveService.ts';
@@ -27,11 +30,214 @@ const pointInPoly = (pt: Vector2, poly: Vector2[]): boolean => {
   return inside;
 };
 
-const isPointOnBridge = (point: Vector2, bridges: Bridge[]): boolean => {
-    const PADDING = 20;
-    return bridges.some(b => isPointInRect(point, [b.rect[0]-PADDING, b.rect[1]-PADDING, b.rect[2]+PADDING*2, b.rect[3]+PADDING*2]));
-};
+const isPointOnBridge = (point: Vector2, bridges: Bridge[]): boolean =>
+  bridges.some((b) =>
+    isPointInRect(point, [
+      b.rect[0] - BRIDGE_SNAP_PADDING,
+      b.rect[1] - BRIDGE_SNAP_PADDING,
+      b.rect[2] + BRIDGE_SNAP_PADDING * 2,
+      b.rect[3] + BRIDGE_SNAP_PADDING * 2,
+    ]),
+  );
 const rand = (a:number, b:number) => a + Math.random() * (b-a);
+const len = (v: Vector2) => Math.hypot(v.x, v.y);
+const norm = (v: Vector2) => {
+  const L = len(v) || 1;
+  return { x: v.x / L, y: v.y / L };
+};
+const distance = (a: Vector2, b: Vector2) => Math.hypot(a.x - b.x, a.y - b.y);
+
+const segmentCrossesWater = (start: Vector2, end: Vector2, bridges: Bridge[]): boolean => {
+  const steps = Math.max(4, Math.ceil(distance(start, end) / 40), BRIDGE_PATH_SAMPLES);
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const sample = { x: start.x + dx * t, y: start.y + dy * t };
+    if (isPointInWater(sample) && !isPointOnBridge(sample, bridges)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const resolvePath = (start: Vector2, destination: Vector2, bridges: Bridge[]): Vector2[] | null => {
+  if (isPointInWater(destination) && !isPointOnBridge(destination, bridges)) {
+    return null;
+  }
+
+  if (!segmentCrossesWater(start, destination, bridges)) {
+    return [destination];
+  }
+
+  const clampPoint = (point: Vector2): Vector2 => ({
+    x: Math.max(0, Math.min(GAME_WORLD_SIZE.width, point.x)),
+    y: Math.max(0, Math.min(GAME_WORLD_SIZE.height, point.y)),
+  });
+
+  let bestPath: Vector2[] | null = null;
+  let bestCost = Infinity;
+
+  bridges.forEach((bridge) => {
+    if (bridge.repairGag) return;
+
+    const [bx, by, bw, bh] = bridge.rect;
+    const centerX = bx + bw / 2;
+    const centerY = by + bh / 2;
+    const horizontal = bw >= bh;
+    const approachOffset = Math.max(BRIDGE_APPROACH_DISTANCE, Math.max(bw, bh) * 1.5);
+
+    let entry: Vector2;
+    let exit: Vector2;
+    const midpoint: Vector2 = { x: centerX, y: centerY };
+
+    if (horizontal) {
+      const south: Vector2 = clampPoint({ x: centerX, y: by + bh + approachOffset });
+      const north: Vector2 = clampPoint({ x: centerX, y: by - approachOffset });
+      const startNorth = start.y < centerY;
+      const destNorth = destination.y < centerY;
+      if (startNorth === destNorth) {
+        return;
+      }
+      entry = startNorth ? north : south;
+      exit = destNorth ? north : south;
+    } else {
+      const east: Vector2 = clampPoint({ x: bx + bw + approachOffset, y: centerY });
+      const west: Vector2 = clampPoint({ x: bx - approachOffset, y: centerY });
+      const startEast = start.x > centerX;
+      const destEast = destination.x > centerX;
+      if (startEast === destEast) {
+        return;
+      }
+      entry = startEast ? east : west;
+      exit = destEast ? east : west;
+    }
+
+    const path = [entry, midpoint, exit, destination];
+    let cost = 0;
+    let blocked = false;
+    let prev = start;
+    for (const node of path) {
+      if (segmentCrossesWater(prev, node, bridges) && node !== midpoint) {
+        blocked = true;
+        break;
+      }
+      cost += distance(prev, node);
+      prev = node;
+    }
+
+    if (!blocked && cost < bestCost) {
+      bestCost = cost;
+      bestPath = path;
+    }
+  });
+
+  return bestPath ? bestPath.map((node) => ({ ...node })) : null;
+};
+
+const refinePathSegments = (start: Vector2, path: Vector2[]): Vector2[] => {
+  if (!path.length) return [];
+  const refined: Vector2[] = [];
+  let cursor = { ...start };
+  path.forEach((node) => {
+    const dx = node.x - cursor.x;
+    const dy = node.y - cursor.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= 1) {
+      refined.push({ ...node });
+    } else {
+      const steps = Math.max(1, Math.ceil(dist / 220));
+      for (let i = 1; i <= steps; i++) {
+        refined.push({
+          x: cursor.x + (dx * i) / steps,
+          y: cursor.y + (dy * i) / steps,
+        });
+      }
+    }
+    cursor = node;
+  });
+  return refined;
+};
+
+const weightedZonePick = (zones: Zone[]): Zone => {
+  const weights = zones.map((z) => Math.max(0.1, z.spawnMultiplier));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let roll = Math.random() * total;
+  for (let i = 0; i < zones.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) {
+      return zones[i];
+    }
+  }
+  return zones[zones.length - 1];
+};
+
+const spawnCollectibleAt = (
+  state: GameState,
+  position: Vector2,
+  idCounter: MutableRefObject<number>,
+  spawnTime: number,
+) => {
+  const collectible: Collectible = {
+    id: idCounter.current++,
+    type: Math.random() < 0.75 ? 'can' : 'bottle',
+    position,
+    emoji: '🥫',
+    spawnTime,
+    imageUrl: CAN_IMAGE_URLS[Math.floor(Math.random() * CAN_IMAGE_URLS.length)],
+  };
+  state.collectibles.push(collectible);
+};
+
+const scatterCollectiblesAround = (
+  state: GameState,
+  center: Vector2,
+  radius: number,
+  count: number,
+  idCounter: MutableRefObject<number>,
+) => {
+  let attempts = 0;
+  const maxAttempts = count * 12;
+  const spawnTime = state.gameTime;
+  while (count > 0 && attempts < maxAttempts) {
+    attempts++;
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * radius;
+    const candidate = {
+      x: center.x + Math.cos(angle) * distance,
+      y: center.y + Math.sin(angle) * distance,
+    };
+    if (candidate.x < 0 || candidate.x > GAME_WORLD_SIZE.width || candidate.y < 0 || candidate.y > GAME_WORLD_SIZE.height) {
+      continue;
+    }
+    if (isPointInWater(candidate)) continue;
+    spawnCollectibleAt(state, candidate, idCounter, spawnTime);
+    count--;
+  }
+};
+
+const ensureInitialCollectibles = (state: GameState, idCounter: MutableRefObject<number>) => {
+  if (state.collectibles.length >= INITIAL_COLLECTIBLE_TARGET) return;
+  scatterCollectiblesAround(state, state.player.position, 320, 24, idCounter);
+  scatterCollectiblesAround(
+    state,
+    { x: state.player.position.x + 260, y: state.player.position.y - 220 },
+    360,
+    14,
+    idCounter,
+  );
+
+  const guardLimit = INITIAL_COLLECTIBLE_TARGET * 20;
+  let guard = 0;
+  while (state.collectibles.length < INITIAL_COLLECTIBLE_TARGET && guard < guardLimit) {
+    guard++;
+    const zone = weightedZonePick(state.zones);
+    const [zx, zy, zw, zh] = zone.rect;
+    const candidate = { x: zx + Math.random() * zw, y: zy + Math.random() * zh };
+    if (isPointInWater(candidate)) continue;
+    spawnCollectibleAt(state, candidate, idCounter, state.gameTime);
+  }
+};
 
 let critterIdCounter = 0, trafficIdCounter = 0, npcIdCounter = 0;
 const spawnCritter = (kind: CritterKind, pos: Vector2): Critter => ({ id: critterIdCounter++, kind, pos:{...pos}, state:'IDLE', dir: rand(0, Math.PI * 2), speed: kind==='cat' ? rand(28, 42) : rand(30, 48), tState: 0, tAnim: 0, anim: kind+'_idle', bbox: { w: 24, h: 24 } });
@@ -49,9 +255,25 @@ const spawnNpc = (type: NPCType, pos: Vector2): NPC => {
 };
 
 const getInitialPlayerState = (): PlayerState => ({
-  position: {x: 1750, y: 3850}, targetPosition: null, speed: PLAYER_BASE_SPEED,
-  inventory: [], inventoryCap: BASE_INVENTORY_CAP, money: 0, upgrades: new Set(), hasCollectedFirstCan: false,
-  hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP, stash: [], stashCap: 50, isInvulnerable: false, invulnerableTimer: 0,
+  position: { x: 1750, y: 3850 },
+  targetPosition: null,
+  pathQueue: [],
+  speed: PLAYER_BASE_SPEED,
+  velocity: { x: 0, y: 0 },
+  inventory: [],
+  inventoryCap: BASE_INVENTORY_CAP,
+  money: 0,
+  upgrades: new Set(),
+  hasCollectedFirstCan: false,
+  speedBoostTimer: 0,
+  collectChain: 0,
+  lastCollectTime: 0,
+  hp: PLAYER_MAX_HP,
+  maxHp: PLAYER_MAX_HP,
+  stash: [],
+  stashCap: 50,
+  isInvulnerable: false,
+  invulnerableTimer: 0,
 });
 
 // Create a temporary canvas context for text measurement to avoid touching the DOM
@@ -101,6 +323,11 @@ export const useGameEngine = () => {
   if (gameState.current === null) {
       const saved = saveService.loadGame();
       const playerState = saved ? { ...getInitialPlayerState(), ...saved.player, upgrades: new Set(Array.from(saved.player.upgrades)), hasCollectedFirstCan: saved.player.hasCollectedFirstCan || false } : getInitialPlayerState();
+      playerState.pathQueue = (playerState.pathQueue || []).map((node) => ({ ...node }));
+      playerState.velocity = playerState.velocity ? { ...playerState.velocity } : { x: 0, y: 0 };
+      playerState.collectChain = playerState.collectChain || 0;
+      playerState.lastCollectTime = playerState.lastCollectTime || 0;
+      playerState.speedBoostTimer = playerState.speedBoostTimer || 0;
       collectibleIdCounter.current = saved ? Math.max(1, ...saved.collectibles.map(c => c.id)) + 1 : 1;
       
       gameState.current = {
@@ -113,12 +340,27 @@ export const useGameEngine = () => {
         dialogue: [], closestBridge: null,
       };
 
+      if (!saved || (saved.collectibles?.length ?? 0) < INITIAL_COLLECTIBLE_TARGET) {
+        ensureInitialCollectibles(gameState.current, collectibleIdCounter);
+      }
+
       setUiState({
-        money: playerState.money, inventoryCount: playerState.inventory.length, inventoryCap: playerState.inventoryCap,
-        stashCount: playerState.stash.length, stashCap: playerState.stashCap, hp: playerState.hp, maxHp: playerState.maxHp,
-        activeQuest: gameState.current.activeQuest, gameTime: gameState.current.gameTime, language: gameState.current.language,
-        flashMessageKey: null, isCashingOut: false, hasCollectedFirstCan: playerState.hasCollectedFirstCan,
-        isInventoryFull: playerState.inventory.length >= playerState.inventoryCap, purchasedUpgrades: playerState.upgrades,
+        money: playerState.money,
+        inventoryCount: playerState.inventory.length,
+        inventoryCap: playerState.inventoryCap,
+        stashCount: playerState.stash.length,
+        stashCap: playerState.stashCap,
+        hp: playerState.hp,
+        maxHp: playerState.maxHp,
+        activeQuest: gameState.current.activeQuest,
+        gameTime: gameState.current.gameTime,
+        language: gameState.current.language,
+        flashMessageKey: null,
+        isCashingOut: false,
+        hasCollectedFirstCan: playerState.hasCollectedFirstCan,
+        isInventoryFull: playerState.inventory.length >= playerState.inventoryCap,
+        purchasedUpgrades: playerState.upgrades,
+        speedBoostTimer: playerState.speedBoostTimer,
       });
   }
 
@@ -157,27 +399,79 @@ export const useGameEngine = () => {
         }
     }
     
-    // --- Player Movement (move-then-check approach) ---
-    if (player.targetPosition) {
-      const prevPos = { ...player.position };
-      const dx = player.targetPosition.x - player.position.x;
-      const dy = player.targetPosition.y - player.position.y;
-      const distance = Math.hypot(dx, dy);
-      
-      if (distance < player.speed * deltaTime) {
-        player.position = { ...player.targetPosition };
-        player.targetPosition = null;
-      } else {
-        player.position.x += (dx / distance) * player.speed * deltaTime;
-        player.position.y += (dy / distance) * player.speed * deltaTime;
-      }
-      
-      // After moving, check if the new position is invalid
-      if (isPointInWater(player.position) && !isPointOnBridge(player.position, state.bridges)) {
-        player.position = prevPos; // Revert to the last valid position
-        player.targetPosition = null; // Stop trying to move into water
+    // --- Player Movement (smoothed click-to-move) ---
+    if (!player.targetPosition && player.pathQueue.length > 0) {
+      const next = player.pathQueue.shift();
+      if (next) {
+        player.targetPosition = next;
       }
     }
+
+    const activeSpeed = player.speed * (player.speedBoostTimer > 0 ? SPEED_BOOST_MULTIPLIER : 1);
+    const prevPos = { ...player.position };
+    const velocity = player.velocity;
+
+    if (player.targetPosition) {
+      const dx = player.targetPosition.x - player.position.x;
+      const dy = player.targetPosition.y - player.position.y;
+      const distanceToTarget = Math.hypot(dx, dy);
+
+      if (distanceToTarget < Math.max(4, activeSpeed * deltaTime * 0.9)) {
+        player.position = { ...player.targetPosition };
+        player.targetPosition = null;
+        velocity.x = 0;
+        velocity.y = 0;
+      } else {
+        const desiredVx = (dx / distanceToTarget) * activeSpeed;
+        const desiredVy = (dy / distanceToTarget) * activeSpeed;
+        const smoothing = 1 - Math.pow(0.001, deltaTime * 12);
+        velocity.x += (desiredVx - velocity.x) * smoothing;
+        velocity.y += (desiredVy - velocity.y) * smoothing;
+
+        const velocityMag = Math.hypot(velocity.x, velocity.y);
+        const maxResponsiveSpeed = activeSpeed * 1.45;
+        if (velocityMag > maxResponsiveSpeed) {
+          const scale = maxResponsiveSpeed / velocityMag;
+          velocity.x *= scale;
+          velocity.y *= scale;
+        }
+
+        player.position.x += velocity.x * deltaTime;
+        player.position.y += velocity.y * deltaTime;
+      }
+    } else {
+      const damping = Math.pow(0.01, deltaTime * 6);
+      velocity.x *= damping;
+      velocity.y *= damping;
+      if (Math.abs(velocity.x) < 0.02) velocity.x = 0;
+      if (Math.abs(velocity.y) < 0.02) velocity.y = 0;
+      player.position.x += velocity.x * deltaTime;
+      player.position.y += velocity.y * deltaTime;
+    }
+
+    if (isPointInWater(player.position) && !isPointOnBridge(player.position, state.bridges)) {
+      player.position = prevPos;
+      player.targetPosition = null;
+      player.pathQueue = [];
+      velocity.x = 0;
+      velocity.y = 0;
+    }
+
+    if (!player.targetPosition && player.pathQueue.length > 0) {
+      const next = player.pathQueue.shift();
+      if (next) {
+        player.targetPosition = next;
+      }
+    }
+    if (player.speedBoostTimer > 0) {
+      player.speedBoostTimer = Math.max(0, player.speedBoostTimer - deltaTime * 1000);
+      if (player.speedBoostTimer === 0) {
+        player.collectChain = 0;
+      }
+    } else if (player.collectChain > 0 && state.gameTime - player.lastCollectTime > SPEED_BOOST_CHAIN_WINDOW) {
+      player.collectChain = 0;
+    }
+
     state.camera.x += (player.position.x - state.camera.x) * 0.2;
     state.camera.y += (player.position.y - state.camera.y) * 0.2;
 
@@ -234,7 +528,7 @@ export const useGameEngine = () => {
     state.dialogue = state.dialogue.map(d => ({...d, life: d.life - deltaTime})).filter(d => d.life > 0);
 
     // Bridge Navigation
-    const BORDER_PROXIMITY = 300;
+    const BORDER_PROXIMITY = BRIDGE_APPROACH_DISTANCE;
     const isNearBorder = (!isInQuebec(player.position) && player.position.y < QUEBEC_BORDER_Y + BORDER_PROXIMITY) || (isInQuebec(player.position) && player.position.y > QUEBEC_BORDER_Y - BORDER_PROXIMITY);
     if(isNearBorder && !isPointOnBridge(player.position, BRIDGES)) {
         let closestBridge: Bridge | null = null; let minD = Infinity;
@@ -249,9 +543,11 @@ export const useGameEngine = () => {
     }
 
     // --- Spawner ---
-    if (state.collectibles.length < MAX_COLLECTIBLES && Math.random() < 0.5) {
+    const earlyGameBoost = state.gameTime < 180000 ? 0.7 : 0.5;
+    if (state.collectibles.length < MAX_COLLECTIBLES && Math.random() < earlyGameBoost) {
         const zone = ZONES[Math.floor(Math.random() * ZONES.length)];
-        if (Math.random() < zone.spawnMultiplier * 0.2) {
+        const zoneChance = Math.min(0.9, zone.spawnMultiplier * 0.2 * (state.gameTime < 180000 ? 1.6 : 1));
+        if (Math.random() < zoneChance) {
             const [zx, zy, zw, zh] = zone.rect;
             const position = { x: zx + Math.random() * zw, y: zy + Math.random() * zh };
             if (!isPointInWater(position)) {
@@ -281,6 +577,18 @@ export const useGameEngine = () => {
         audioService.playPickupSound();
         const newText: FloatingText = { id: effectIdCounter.current++, text: `+${(collectedToday.length * COLLECTIBLE_VALUE * 100).toFixed(0)}¢`, position: {...player.position, y: player.position.y - 40}, life: 1.0, color: '#39FF14' };
         state.floatingTexts.push(newText);
+        const now = state.gameTime;
+        if (now - player.lastCollectTime < SPEED_BOOST_CHAIN_WINDOW) {
+            player.collectChain += collectedToday.length;
+        } else {
+            player.collectChain = collectedToday.length;
+        }
+        player.lastCollectTime = now;
+        if (collectedToday.length >= SPEED_BOOST_BATCH_TRIGGER || player.collectChain >= SPEED_BOOST_CHAIN_THRESHOLD) {
+            player.speedBoostTimer = SPEED_BOOST_DURATION;
+            state.floatingTexts.push({ id: effectIdCounter.current++, text: 'Speed Boost!', position: {...player.position, y: player.position.y - 70}, life: 1.2, color: '#FFD93D' });
+            audioService.playBoostSound();
+        }
         if (state.activeQuest) {
             const questItems = collectedToday.filter(c => !state.activeQuest!.targetZone || c.zone?.name === state.activeQuest!.targetZone);
             state.activeQuest.progress += questItems.length;
@@ -317,11 +625,22 @@ export const useGameEngine = () => {
       const state = gameState.current;
       if (state) {
         setUiState({
-            money: state.player.money, inventoryCount: state.player.inventory.length, inventoryCap: state.player.inventoryCap,
-            stashCount: state.player.stash.length, stashCap: state.player.stashCap, hp: state.player.hp, maxHp: state.player.maxHp,
-            activeQuest: state.activeQuest, gameTime: state.gameTime, language: state.language,
-            flashMessageKey: state.flashMessageKey, isCashingOut: state.isCashingOut, hasCollectedFirstCan: state.player.hasCollectedFirstCan,
-            isInventoryFull: state.player.inventory.length >= state.player.inventoryCap, purchasedUpgrades: state.player.upgrades,
+            money: state.player.money,
+            inventoryCount: state.player.inventory.length,
+            inventoryCap: state.player.inventoryCap,
+            stashCount: state.player.stash.length,
+            stashCap: state.player.stashCap,
+            hp: state.player.hp,
+            maxHp: state.player.maxHp,
+            activeQuest: state.activeQuest,
+            gameTime: state.gameTime,
+            language: state.language,
+            flashMessageKey: state.flashMessageKey,
+            isCashingOut: state.isCashingOut,
+            hasCollectedFirstCan: state.player.hasCollectedFirstCan,
+            isInventoryFull: state.player.inventory.length >= state.player.inventoryCap,
+            purchasedUpgrades: state.player.upgrades,
+            speedBoostTimer: state.player.speedBoostTimer,
         });
         if (state.flashMessageKey) {
             if (flashMessageTimeoutRef.current) clearTimeout(flashMessageTimeoutRef.current);
@@ -346,13 +665,36 @@ export const useGameEngine = () => {
   useEffect(() => { const saveInterval = setInterval(() => { if (gameState.current) saveService.saveGame(gameState.current); }, 5000); return () => clearInterval(saveInterval); }, []);
 
   const setTargetPosition = useCallback((position: Vector2, isBridgeClick: boolean = false) => {
-    let targetBridge: Bridge | undefined;
-    if(!isBridgeClick){ targetBridge = BRIDGES.find(b => b.repairGag && isPointInRect(position, b.rect)); }
-    if (targetBridge) { setToast('toast_detour', 4000); } 
-    else {
-        gameState.current.player.targetPosition = { ...position };
-        gameState.current.clickMarkers.push({id: effectIdCounter.current++, position, life: 1.0});
+    const state = gameState.current;
+    if (!state) return;
+
+    if (!isBridgeClick) {
+      const targetBridge = state.bridges.find((b) => b.repairGag && isPointInRect(position, b.rect));
+      if (targetBridge) {
+        setToast('toast_detour', 4000);
+        return;
+      }
     }
+
+    const path = resolvePath(state.player.position, position, state.bridges);
+    if (!path || path.length === 0) {
+      setToast('toast_need_bridge', 4000);
+      return;
+    }
+
+    const refinedPath = refinePathSegments(state.player.position, path);
+    if (!refinedPath.length) {
+      state.player.targetPosition = null;
+      state.player.pathQueue = [];
+      return;
+    }
+
+    const [first, ...rest] = refinedPath;
+    state.player.targetPosition = { ...first };
+    state.player.pathQueue = rest.map((node) => ({ ...node }));
+    state.player.velocity.x = 0;
+    state.player.velocity.y = 0;
+    state.clickMarkers.push({ id: effectIdCounter.current++, position: { ...position }, life: 1.0 });
   }, []);
 
   const buyUpgrade = (upgradeId: UpgradeId) => {

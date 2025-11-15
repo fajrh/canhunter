@@ -31,6 +31,7 @@ const translations: Record<string, Record<Language, string>> = {
   'quest_3_desc': { en: 'Time to expand! Collect 50 items anywhere in the city.', fr: "C'est l'heure de l'expansion ! Ramassez 50 objets." },
   'quest_4_desc': { en: 'Big spender! Earn a total of $100 to prove your skills.', fr: 'Grand dépensier ! Gagnez 100 $ pour prouver vos compétences.' },
   'quest_5_desc': { en: 'Glebe Gallivanter! Collect 40 items in The Glebe.', fr: 'Vadrouilleur du Glebe ! Ramassez 40 objets dans le Glebe.' },
+  'hud_boost': { en: 'Boost', fr: 'Turbo' },
   
   // Controls
   'upgrades_button': { en: 'Upgrades', fr: 'Amélios' },
@@ -79,6 +80,7 @@ const translations: Record<string, Record<Language, string>> = {
   'toast_no_money': { en: 'Not enough money!', fr: "Pas assez d'argent !" },
   'toast_reset': { en: 'Game progress has been reset.', fr: 'La progression du jeu a été réinitialisée.' },
   'toast_detour': { en: 'Detour! Alexandra Bridge is under repair.', fr: 'Détour ! Le pont Alexandra est en réparation.' },
+  'toast_need_bridge': { en: 'Find a bridge to cross the river!', fr: 'Trouvez un pont pour traverser la rivière !' },
   'toast_stash_full': { en: 'Stash is full!', fr: 'La planque est pleine !' },
 
   // Landmarks
