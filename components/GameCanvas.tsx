@@ -1,4 +1,3 @@
-// GameCanvas.tsx
 import React, { useRef, useEffect, useState } from 'react';
 import type { GameState, Vector2, ChatBubble } from '../types.ts';
 import {
@@ -12,9 +11,10 @@ import {
   ROADS,
   ROAD_TEXTURE_URL,
   ROAD_TILE_SIZE,
+  LANDMARK_SPRITE_URLS,
   ROAD_LABELS,
-  ROAD_SIGN_GREEN,
-  ROAD_SIGN_GREEN_BORDER
+  ONTARIO_SIGN_GREEN,
+  ONTARIO_SIGN_BORDER,
 } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
@@ -28,11 +28,11 @@ const drawChatBubble = (
   ctx: CanvasRenderingContext2D,
   bubble: ChatBubble,
   camera: Vector2,
-  canvasSize: { width: number; height: number }
+  canvasSize: { width: number; height: number },
 ) => {
   const pos = {
     x: bubble.position.x - camera.x + canvasSize.width / 2,
-    y: bubble.position.y - camera.y + canvasSize.height / 2
+    y: bubble.position.y - camera.y + canvasSize.height / 2,
   };
 
   const bubbleX = pos.x - bubble.width / 2;
@@ -46,13 +46,18 @@ const drawChatBubble = (
   ctx.beginPath();
   ctx.moveTo(bubbleX + 10, bubbleY);
   ctx.lineTo(bubbleX + bubble.width - 10, bubbleY);
-  ctx.quadraticCurveTo(bubbleX + bubble.width, bubbleY, bubbleX + bubble.width, bubbleY + 10);
+  ctx.quadraticCurveTo(
+    bubbleX + bubble.width,
+    bubbleY,
+    bubbleX + bubble.width,
+    bubbleY + 10,
+  );
   ctx.lineTo(bubbleX + bubble.width, bubbleY + bubble.height - 10);
   ctx.quadraticCurveTo(
     bubbleX + bubble.width,
     bubbleY + bubble.height,
     bubbleX + bubble.width - 10,
-    bubbleY + bubble.height
+    bubbleY + bubble.height,
   );
   ctx.lineTo(pos.x + 5, bubbleY + bubble.height);
   ctx.lineTo(pos.x, bubbleY + bubble.height + 10);
@@ -62,7 +67,7 @@ const drawChatBubble = (
     bubbleX,
     bubbleY + bubble.height,
     bubbleX,
-    bubbleY + bubble.height - 10
+    bubbleY + bubble.height - 10,
   );
   ctx.lineTo(bubbleX, bubbleY + 10);
   ctx.quadraticCurveTo(bubbleX, bubbleY, bubbleX + 10, bubbleY);
@@ -80,23 +85,45 @@ const drawChatBubble = (
     ctx.fillText(
       bubble.lines[i],
       bubbleX + bubble.width / 2,
-      bubbleY + 10 + i * lineHeight
+      bubbleY + 10 + i * lineHeight,
     );
   }
   ctx.globalAlpha = 1;
 };
 
+const drawRoundedRect = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) => {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+};
+
 const GameCanvas: React.FC<GameCanvasProps> = ({
   gameStateRef,
-  onSetTargetPosition
+  onSetTargetPosition,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvasSize, setCanvasSize] = useState({
     width: window.innerWidth,
-    height: window.innerHeight
+    height: window.innerHeight,
   });
   const [devicePixelRatio, setDevicePixelRatio] = useState(
-    window.devicePixelRatio || 1
+    window.devicePixelRatio || 1,
   );
   const waterFxRef = useRef<WaterFX | null>(null);
   const patternCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -104,18 +131,24 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   const roadPatternCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const roadPatternRef = useRef<CanvasPattern | null>(null);
 
-  const [loadedImages, setLoadedImages] = useState<Record<string, HTMLImageElement>>({});
+  const [loadedImages, setLoadedImages] = useState<
+    Record<string, HTMLImageElement>
+  >({});
   const [loadingProgress, setLoadingProgress] = useState({
     loaded: 0,
-    total: 1
+    total: 1,
   });
   const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
 
-  if (!waterFxRef.current) waterFxRef.current = new WaterFX(208, true);
-
   useEffect(() => {
+    const landmarkSpriteUrls = Object.values(LANDMARK_SPRITE_URLS);
     const imagesToLoad = Array.from(
-      new Set([...CAN_IMAGE_URLS, CRITTER_ATLAS.image, ROAD_TEXTURE_URL])
+      new Set([
+        ...CAN_IMAGE_URLS,
+        CRITTER_ATLAS.image,
+        ROAD_TEXTURE_URL,
+        ...landmarkSpriteUrls,
+      ]),
     );
     let loadedCount = 0;
     setLoadingProgress({ loaded: 0, total: imagesToLoad.length });
@@ -134,40 +167,44 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         loadedCount++;
         setLoadingProgress({
           loaded: loadedCount,
-          total: imagesToLoad.length
+          total: imagesToLoad.length,
         });
-        if (loadedCount === imagesToLoad.length)
+        if (loadedCount === imagesToLoad.length) {
           setTimeout(() => setAllAssetsLoaded(true), 500);
+        }
       };
       img.onerror = () => {
         console.error(`Failed to load image: ${url}`);
         loadedCount++;
         setLoadingProgress({
           loaded: loadedCount,
-          total: imagesToLoad.length
+          total: imagesToLoad.length,
         });
-        if (loadedCount === imagesToLoad.length)
+        if (loadedCount === imagesToLoad.length) {
           setTimeout(() => setAllAssetsLoaded(true), 500);
+        }
       };
     });
   }, []);
 
+  if (!waterFxRef.current) waterFxRef.current = new WaterFX(208, true);
+
   const worldToScreen = (
     pos: Vector2,
     camera: Vector2,
-    canvasDim: { width: number; height: number }
+    canvasDim: { width: number; height: number },
   ): Vector2 => ({
     x: pos.x - camera.x + canvasDim.width / 2,
-    y: pos.y - camera.y + canvasDim.height / 2
+    y: pos.y - camera.y + canvasDim.height / 2,
   });
 
   const screenToWorld = (
     pos: Vector2,
     camera: Vector2,
-    canvasDim: { width: number; height: number }
+    canvasDim: { width: number; height: number },
   ): Vector2 => ({
     x: pos.x + camera.x - canvasDim.width / 2,
-    y: pos.y + camera.y - canvasDim.height / 2
+    y: pos.y + camera.y - canvasDim.height / 2,
   });
 
   useEffect(() => {
@@ -177,13 +214,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     };
     window.addEventListener('resize', handleResize);
     const mediaQuery = window.matchMedia(
-      `(resolution: ${window.devicePixelRatio || 1}dppx)`
+      `(resolution: ${window.devicePixelRatio || 1}dppx)`,
     );
     const handleDprChange = () =>
       setDevicePixelRatio(window.devicePixelRatio || 1);
     if (mediaQuery.addEventListener)
       mediaQuery.addEventListener('change', handleDprChange);
-    else if (mediaQuery.addListener) mediaQuery.addListener(handleDprChange);
+    else if (mediaQuery.addListener)
+      mediaQuery.addListener(handleDprChange);
     return () => {
       window.removeEventListener('resize', handleResize);
       if (mediaQuery.removeEventListener)
@@ -201,7 +239,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     canvas.height = Math.floor(canvasSize.height * dpr);
     canvas.style.width = `${canvasSize.width}px`;
     canvas.style.height = `${canvasSize.height}px`;
-    roadPatternRef.current = null; // force re-create pattern on resize / dpr change
+    roadPatternRef.current = null;
   }, [canvasSize, devicePixelRatio]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -210,7 +248,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     const x = e.clientX - (rect?.left ?? 0);
     const y = e.clientY - (rect?.top ?? 0);
     onSetTargetPosition(
-      screenToWorld({ x, y }, gameStateRef.current.camera, canvasSize)
+      screenToWorld({ x, y }, gameStateRef.current.camera, canvasSize),
     );
   };
 
@@ -240,7 +278,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               Math.random() * 256,
               size,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             pctx.fill();
           }
@@ -257,7 +295,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       if (patternCanvasRef.current && !groundPatternRef.current) {
         groundPatternRef.current = ctx.createPattern(
           patternCanvasRef.current,
-          'repeat'
+          'repeat',
         );
       }
       return groundPatternRef.current;
@@ -280,39 +318,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       if (!roadPatternRef.current) {
         roadPatternRef.current = ctx.createPattern(
           roadPatternCanvasRef.current,
-          'repeat'
+          'repeat',
         );
       }
       return roadPatternRef.current;
-    };
-
-    const drawRoundedRect = (
-      ctx2: CanvasRenderingContext2D,
-      x: number,
-      y: number,
-      w: number,
-      h: number,
-      r: number,
-      fill: string,
-      stroke: string
-    ) => {
-      const radius = Math.min(r, w / 2, h / 2);
-      ctx2.beginPath();
-      ctx2.moveTo(x + radius, y);
-      ctx2.lineTo(x + w - radius, y);
-      ctx2.quadraticCurveTo(x + w, y, x + w, y + radius);
-      ctx2.lineTo(x + w, y + h - radius);
-      ctx2.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
-      ctx2.lineTo(x + radius, y + h);
-      ctx2.quadraticCurveTo(x, y + h, x, y + h - radius);
-      ctx2.lineTo(x, y + radius);
-      ctx2.quadraticCurveTo(x, y, x + radius, y);
-      ctx2.closePath();
-      ctx2.fillStyle = fill;
-      ctx2.fill();
-      ctx2.strokeStyle = stroke;
-      ctx2.lineWidth = 2;
-      ctx2.stroke();
     };
 
     let animationFrameId: number;
@@ -323,7 +332,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         animationFrameId = requestAnimationFrame(render);
         return;
       }
-
       const {
         camera,
         player,
@@ -342,14 +350,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         crosswalks,
         dialogue,
         closestBridge,
-        collectibles
+        collectibles,
+        houses,
       } = gameState;
 
       const dpr = devicePixelRatio;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
 
-      // --- Ground ---
       const pattern = ensureGroundPattern();
       ctx.fillStyle = pattern || '#a1c099';
       ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
@@ -359,19 +367,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         left: camera.x - canvasSize.width / 2 - CULL_MARGIN,
         right: camera.x + canvasSize.width / 2 + CULL_MARGIN,
         top: camera.y - canvasSize.height / 2 - CULL_MARGIN,
-        bottom: camera.y + canvasSize.height / 2 + CULL_MARGIN
+        bottom: camera.y + canvasSize.height / 2 + CULL_MARGIN,
       };
 
-      // --- Water (Runescape-style animated water) ---
       const waterFx = waterFxRef.current!;
       waterBodies.forEach((wb) => {
         waterFx.drawWaterBody(ctx, wb.polygon, camera, canvasSize, time);
       });
 
-      // --- Roads ---
+      // --- Roads (with Ontario-style labels) ---
       const roadPattern = ensureRoadPattern();
       const roadFillStyle: CanvasPattern | string = roadPattern ?? '#575757';
 
+      ctx.save();
       ROADS.forEach((road) => {
         const minX = Math.min(road.from.x, road.to.x) - road.width / 2;
         const maxX = Math.max(road.from.x, road.to.x) + road.width / 2;
@@ -385,38 +393,26 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ) {
           return;
         }
-
-        const startWorld = road.from;
-        const endWorld = road.to;
-        const startScreenRaw = worldToScreen(startWorld, camera, canvasSize);
-        const endScreenRaw = worldToScreen(endWorld, camera, canvasSize);
-
-        // Snap to half-pixel grid to reduce jitter/fragmenting across frames
-        const sx = Math.round(startScreenRaw.x) + 0.5;
-        const sy = Math.round(startScreenRaw.y) + 0.5;
-        const ex = Math.round(endScreenRaw.x) + 0.5;
-        const ey = Math.round(endScreenRaw.y) + 0.5;
-
-        const dx = ex - sx;
-        const dy = ey - sy;
+        const startScreen = worldToScreen(road.from, camera, canvasSize);
+        const endScreen = worldToScreen(road.to, camera, canvasSize);
+        const dx = endScreen.x - startScreen.x;
+        const dy = endScreen.y - startScreen.y;
         const length = Math.hypot(dx, dy);
         if (length < 1) return;
         const angle = Math.atan2(dy, dx);
 
+        // Road body
         ctx.save();
-        ctx.translate(sx, sy);
+        ctx.translate(startScreen.x, startScreen.y);
         ctx.rotate(angle);
-
-        const snappedWidth = Math.round(road.width);
         ctx.fillStyle = roadFillStyle;
-        ctx.fillRect(0, -snappedWidth / 2, length, snappedWidth);
+        ctx.fillRect(0, -road.width / 2, length, road.width);
         ctx.strokeStyle = 'rgba(25,25,25,0.8)';
         ctx.lineWidth = 2.5;
-        ctx.strokeRect(0, -snappedWidth / 2, length, snappedWidth);
+        ctx.strokeRect(0, -road.width / 2, length, road.width);
 
         const isBridgeRoad = road.id.startsWith('bridge_');
         if (!isBridgeRoad) {
-          // Center dashed line
           ctx.strokeStyle = 'rgba(255,255,255,0.42)';
           ctx.lineWidth = 2;
           ctx.setLineDash([18, 20]);
@@ -427,66 +423,54 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.stroke();
           ctx.setLineDash([]);
         } else {
-          // Bridges slightly lighter overlay
           ctx.fillStyle = 'rgba(255,255,255,0.08)';
-          ctx.fillRect(0, -snappedWidth / 2, length, snappedWidth);
+          ctx.fillRect(0, -road.width / 2, length, road.width);
         }
-
         ctx.restore();
 
-        // --- Road label (Ontario green sign) ---
-        const label = ROAD_LABELS[road.id];
-        if (label) {
-          const midWorld: Vector2 = {
-            x: (road.from.x + road.to.x) / 2,
-            y: (road.from.y + road.to.y) / 2
-          };
-          const midScreen = worldToScreen(midWorld, camera, canvasSize);
+        // Road label (Ontario guide-sign style)
+        const midWorld: Vector2 = {
+          x: (road.from.x + road.to.x) / 2,
+          y: (road.from.y + road.to.y) / 2,
+        };
+        const midScreen = worldToScreen(midWorld, camera, canvasSize);
+        const labelText =
+          ROAD_LABELS[road.id] ?? road.id.replace(/_/g, ' ').toUpperCase();
 
-          if (
-            midWorld.x < viewBounds.left ||
-            midWorld.x > viewBounds.right ||
-            midWorld.y < viewBounds.top ||
-            midWorld.y > viewBounds.bottom
-          ) {
-            // off-screen
-          } else {
-            ctx.save();
-            ctx.font = 'bold 8pt Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            const text = label.toUpperCase();
-            const metrics = ctx.measureText(text);
-            const textWidth = metrics.width;
-            const paddingX = 6;
-            const paddingY = 3;
-            const rectWidth = textWidth + paddingX * 2;
-            const rectHeight = 14;
+        ctx.save();
+        ctx.font = 'bold 8pt Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const textMetrics = ctx.measureText(labelText);
+        const textWidth = textMetrics.width;
+        const paddingX = 6;
+        const paddingY = 3;
+        const signWidth = textWidth + paddingX * 2;
+        const signHeight = 18;
+        const signX = midScreen.x - signWidth / 2;
+        const signY = midScreen.y - signHeight / 2 - 8;
 
-            const x = Math.round(midScreen.x - rectWidth / 2) + 0.5;
-            const y = Math.round(midScreen.y - rectHeight / 2) + 0.5;
+        drawRoundedRect(ctx, signX, signY, signWidth, signHeight, 4);
+        ctx.fillStyle = ONTARIO_SIGN_GREEN;
+        ctx.fill();
+        ctx.strokeStyle = ONTARIO_SIGN_BORDER;
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
-            drawRoundedRect(
-              ctx,
-              x,
-              y,
-              rectWidth,
-              rectHeight,
-              4,
-              ROAD_SIGN_GREEN,
-              ROAD_SIGN_GREEN_BORDER
-            );
-
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillText(text, x + rectWidth / 2, y + rectHeight / 2 + 0.5);
-            ctx.restore();
-          }
-        }
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(labelText, midScreen.x, signY + signHeight / 2 + 0.5);
+        ctx.restore();
       });
+      ctx.restore();
 
-      // --- Vignette ---
+      // Subtle vertical vignette
       ctx.save();
-      const vignette = ctx.createLinearGradient(0, 0, 0, canvasSize.height);
+      const vignette = ctx.createLinearGradient(
+        0,
+        0,
+        0,
+        canvasSize.height,
+      );
       vignette.addColorStop(0, 'rgba(0,0,0,0.18)');
       vignette.addColorStop(0.3, 'rgba(0,0,0,0)');
       vignette.addColorStop(0.7, 'rgba(0,0,0,0)');
@@ -495,18 +479,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
       ctx.restore();
 
-      // --- Ontario / Quebec border ---
+      // Quebec / Ontario border
       const borderY = QUEBEC_BORDER_Y;
       if (borderY > viewBounds.top && borderY < viewBounds.bottom) {
         const borderStartScreen = worldToScreen(
           { x: -100, y: borderY },
           camera,
-          canvasSize
+          canvasSize,
         );
         const borderEndScreen = worldToScreen(
           { x: GAME_WORLD_SIZE.width + 100, y: borderY },
           camera,
-          canvasSize
+          canvasSize,
         );
         ctx.save();
         ctx.beginPath();
@@ -522,12 +506,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       }
 
-      // --- Bridges (rects over the river) ---
+      // Render bridges (above water/ground, below player)
       bridges.forEach((b) => {
         const { x, y } = worldToScreen(
           { x: b.rect[0], y: b.rect[1] },
           camera,
-          canvasSize
+          canvasSize,
         );
         const width = b.rect[2];
         const height = b.rect[3];
@@ -551,17 +535,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       });
 
+      // Highlight closest bridge if guidance is active
       if (closestBridge) {
         const [bx, by, bw, bh] = closestBridge.rect;
         const topLeft = worldToScreen(
           { x: bx, y: by },
           camera,
-          canvasSize
+          canvasSize,
         );
         const bottomRight = worldToScreen(
           { x: bx + bw, y: by + bh },
           camera,
-          canvasSize
+          canvasSize,
         );
         const width = bottomRight.x - topLeft.x;
         const height = bottomRight.y - topLeft.y;
@@ -590,18 +575,84 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fillText(
           `${t('bridge_label', language)}: ${bridgeName}`,
           labelX + labelWidth / 2,
-          labelY + 24
+          labelY + 24,
         );
         ctx.restore();
       }
 
-      // TODO: crosswalk drawing (unchanged)
+      // Crosswalks (you can flesh this out later)
       crosswalks.forEach((_cw) => {
-        // you had a placeholder here; keep your old implementation if needed
+        // draw crosswalk stripes if you want
       });
 
-      // --- Landmarks, foliage, collectibles ---
-      [...landmarks, ...foliage, ...collectibles].forEach((obj: any) => {
+      // --- Foliage (under landmarks / cans) ---
+      foliage.forEach((obj) => {
+        if (
+          obj.position.x < viewBounds.left ||
+          obj.position.x > viewBounds.right ||
+          obj.position.y < viewBounds.top ||
+          obj.position.y > viewBounds.bottom
+        )
+          return;
+        const { x, y } = worldToScreen(obj.position, camera, canvasSize);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.font =
+          obj.type === 'other' ? '24px sans-serif' : '30px sans-serif';
+        ctx.fillText(obj.emoji, x, y);
+      });
+
+      // --- Landmarks (pixel-art sprites, under cans/NPC/player) ---
+      landmarks.forEach((lm) => {
+        if (
+          lm.position.x < viewBounds.left ||
+          lm.position.x > viewBounds.right ||
+          lm.position.y < viewBounds.top ||
+          lm.position.y > viewBounds.bottom
+        )
+          return;
+
+        const screenPos = worldToScreen(lm.position, camera, canvasSize);
+        const spriteUrl = lm.nameKey
+          ? LANDMARK_SPRITE_URLS[lm.nameKey]
+          : undefined;
+        const img = spriteUrl ? loadedImages[spriteUrl] : undefined;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+
+        if (img) {
+          // Small unobtrusive pixel-art landmarks
+          const targetWidth = 160;
+          const targetHeight = 120;
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(
+            img,
+            screenPos.x - targetWidth / 2,
+            screenPos.y - targetHeight,
+            targetWidth,
+            targetHeight,
+          );
+        } else if (lm.emoji) {
+          ctx.font = '36px sans-serif';
+          ctx.fillText(lm.emoji, screenPos.x, screenPos.y);
+        }
+
+        if (lm.nameKey) {
+          const label = t(lm.nameKey, language);
+          ctx.font = '8pt Arial';
+          ctx.fillStyle = 'white';
+          ctx.strokeStyle = 'black';
+          ctx.lineWidth = 2;
+          ctx.strokeText(label, screenPos.x, screenPos.y + 14);
+          ctx.fillText(label, screenPos.x, screenPos.y + 14);
+        }
+        ctx.restore();
+      });
+
+      // --- Collectibles (beer cans / bottles) ---
+      collectibles.forEach((obj) => {
         if (
           obj.position.x < viewBounds.left ||
           obj.position.x > viewBounds.right ||
@@ -613,7 +664,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
 
-        if ('imageUrl' in obj && obj.imageUrl) {
+        if (obj.imageUrl) {
           const img = loadedImages[obj.imageUrl];
           if (img) {
             const drawHeight = 48;
@@ -624,29 +675,17 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               x - drawWidth / 2,
               y - drawHeight,
               drawWidth,
-              drawHeight
+              drawHeight,
             );
+            return;
           }
-        } else if ('emoji' in obj && obj.emoji) {
-          ctx.font =
-            'type' in obj && obj.type === 'other'
-              ? '24px sans-serif'
-              : '36px sans-serif';
-          ctx.fillText(obj.emoji, x, y);
         }
 
-        if ('nameKey' in obj && obj.nameKey) {
-          ctx.font = '8pt Arial';
-          ctx.fillStyle = 'white';
-          ctx.strokeStyle = 'black';
-          ctx.lineWidth = 2;
-          const text = t(obj.nameKey as string, language);
-          ctx.strokeText(text, x, y + 14);
-          ctx.fillText(text, x, y + 14);
-        }
+        ctx.font = '36px sans-serif';
+        ctx.fillText(obj.emoji, x, y);
       });
 
-      // --- Path preview ---
+      // Path preview
       const pathTargets: Vector2[] = [];
       if (player.targetPosition) pathTargets.push(player.targetPosition);
       if (player.pathQueue.length) pathTargets.push(...player.pathQueue);
@@ -667,8 +706,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       }
 
-      // --- Traffic + NPCs ---
-      [...traffic, ...npcs].forEach((e: any) => {
+      // Traffic + NPCs
+      [...traffic, ...npcs].forEach((e) => {
         if (
           e.position.x < viewBounds.left ||
           e.position.x > viewBounds.right ||
@@ -678,19 +717,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           return;
         const { x, y } = worldToScreen(e.position, camera, canvasSize);
         ctx.font = '36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
         ctx.fillText(e.emoji, x, y);
       });
 
-      // --- Depot + stash ---
+      // Depot + stash icons
       const depotScreenPos = worldToScreen(refundDepot, camera, canvasSize);
       ctx.font = '80px sans-serif';
       ctx.fillText('🏪', depotScreenPos.x, depotScreenPos.y);
       const stashScreenPos = worldToScreen(stashHouse, camera, canvasSize);
-      ctx.font = '80px sans-serif';
       ctx.fillText('📦', stashScreenPos.x, stashScreenPos.y);
 
-      // --- Houses ---
-      gameState.houses.forEach((h) => {
+      // Houses
+      houses.forEach((h) => {
         if (
           h.position.x < viewBounds.left ||
           h.position.x > viewBounds.right ||
@@ -700,15 +740,21 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           return;
         const { x, y } = worldToScreen(h.position, camera, canvasSize);
         ctx.font = '64px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
         ctx.fillText('🏠', x, y);
       });
 
-      // --- Player ---
-      const playerScreenPos = worldToScreen(player.position, camera, canvasSize);
+      // Player
+      const playerScreenPos = worldToScreen(
+        player.position,
+        camera,
+        canvasSize,
+      );
       if (player.speedBoostTimer > 0) {
         const boostRatio = Math.min(
           1,
-          player.speedBoostTimer / SPEED_BOOST_DURATION
+          player.speedBoostTimer / SPEED_BOOST_DURATION,
         );
         ctx.save();
         ctx.globalAlpha = 0.35 + 0.15 * Math.sin(time / 120);
@@ -719,19 +765,21 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           playerScreenPos.y - 12,
           38 + boostRatio * 24,
           0,
-          Math.PI * 2
+          Math.PI * 2,
         );
         ctx.fill();
         ctx.restore();
       }
       if (player.isInvulnerable && Math.floor(time / 100) % 2 === 0) {
-        // flicker
+        // blink off
       } else {
         ctx.font = '48px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
         ctx.fillText(
           player.upgrades.has('bicycle') ? '🚴' : '🧍',
           playerScreenPos.x,
-          playerScreenPos.y
+          playerScreenPos.y,
         );
         const hpBarWidth = 40;
         const hpBarHeight = 5;
@@ -745,15 +793,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           hpBarX,
           hpBarY,
           hpBarWidth * (player.hp / player.maxHp),
-          hpBarHeight
+          hpBarHeight,
         );
       }
 
-      // --- Nearest-bridge arrow ---
+      // Bridge direction hint arrow above player
       if (closestBridge) {
         const angle = Math.atan2(
           closestBridge.from.y - player.position.y,
-          closestBridge.from.x - player.position.x
+          closestBridge.from.x - player.position.x,
         );
         ctx.save();
         ctx.translate(playerScreenPos.x, playerScreenPos.y - 60);
@@ -761,15 +809,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.font = '24px sans-serif';
         ctx.fillStyle = 'rgba(255, 255, 0, 0.9)';
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillText('🔽', 0, 0);
         ctx.font = 'bold 10pt Arial';
         ctx.fillText(t('bridge_label', language), 0, 20);
         ctx.restore();
       }
 
-      // --- Floating texts ---
+      // Floating texts
       floatingTexts.forEach((text) => {
-        const { x, y } = worldToScreen(text.position, camera, canvasSize);
+        const { x, y } = worldToScreen(
+          text.position,
+          camera,
+          canvasSize,
+        );
         ctx.save();
         ctx.font = 'bold 18px sans-serif';
         ctx.globalAlpha = Math.max(0, text.life);
@@ -781,9 +834,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       });
 
-      // --- Click markers ---
+      // Click markers
       clickMarkers.forEach((marker) => {
-        const { x, y } = worldToScreen(marker.position, camera, canvasSize);
+        const { x, y } = worldToScreen(
+          marker.position,
+          camera,
+          canvasSize,
+        );
         ctx.globalAlpha = marker.life;
         ctx.strokeStyle = '#FFFF00';
         ctx.lineWidth = 2;
@@ -797,9 +854,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.globalAlpha = 1.0;
       });
 
-      // --- NPC chat bubbles ---
+      // NPC dialogue bubbles
       dialogue.forEach((bubble) =>
-        drawChatBubble(ctx, bubble, camera, canvasSize)
+        drawChatBubble(ctx, bubble, camera, canvasSize),
       );
 
       animationFrameId = requestAnimationFrame(render);
@@ -821,7 +878,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       {!allAssetsLoaded && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-1/2 max-w-sm pointer-events-none">
           <p className="text-white text-center text-sm text-outline">
-            {t('loading_assets', gameStateRef.current?.language || 'en')}
+            {t(
+              'loading_assets',
+              gameStateRef.current?.language || 'en',
+            )}
           </p>
           <div className="w-full bg-gray-600 rounded-full h-2.5 mt-1 border-2 border-white/50">
             <div
@@ -830,7 +890,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                 width: `${
                   (loadingProgress.loaded / loadingProgress.total) * 100
                 }%`,
-                transition: 'width 0.2s'
+                transition: 'width 0.2s',
               }}
             ></div>
           </div>
