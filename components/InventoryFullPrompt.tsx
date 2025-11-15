@@ -6,9 +6,15 @@ interface InventoryFullPromptProps {
 
 const InventoryFullPrompt: React.FC<InventoryFullPromptProps> = ({ text }) => {
   return (
-    <div className="pointer-events-none absolute top-20 left-1/2 -translate-x-1/2 z-40">
+    <div className="pointer-events-none fixed bottom-6 right-6 z-40">
       <span
-        className="block text-[32px] font-black uppercase tracking-[0.2em] text-yellow-200 drop-shadow-[0_0_12px_rgba(0,0,0,0.85)] animate-[pulse_0.6s_ease-in-out_infinite]"
+        className="font-bold"
+        style={{
+          fontFamily: 'Arial, sans-serif',
+          fontSize: '16px',
+          color: '#ff0000',
+          animation: 'inventory-flash 0.8s step-start infinite',
+        }}
       >
         {text}
       </span>

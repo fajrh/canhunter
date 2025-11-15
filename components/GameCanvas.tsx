@@ -11,6 +11,7 @@ import {
   ROADS,
   ROAD_TEXTURE_URL,
   ROAD_TILE_SIZE,
+  LANDMARKS,
 } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
@@ -182,8 +183,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
   // --- Asset loading (cans, critters, road tile) ---
   useEffect(() => {
+    const landmarkImageUrls = LANDMARKS.filter(
+      (landmark) => Boolean(landmark.imageUrl)
+    ).map((landmark) => landmark.imageUrl!);
     const imagesToLoad = Array.from(
-      new Set([...CAN_IMAGE_URLS, CRITTER_ATLAS.image, ROAD_TEXTURE_URL])
+      new Set([
+        ...CAN_IMAGE_URLS,
+        ...landmarkImageUrls,
+        CRITTER_ATLAS.image,
+        ROAD_TEXTURE_URL,
+      ])
     );
     let loadedCount = 0;
     setLoadingProgress({ loaded: 0, total: imagesToLoad.length });
