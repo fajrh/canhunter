@@ -470,7 +470,6 @@ export const useGameEngine = () => {
       traffic: Array.from({ length: 15 }, spawnTraffic),
       npcs: NPC_SPAWNS.map((n) => spawnNpc(n.type, n.pos)),
       crosswalks: CROSSWALKS,
-      isCashingOut: false,
       isWinter: true,
       dialogue: [],
       closestBridge: null,
@@ -493,11 +492,9 @@ export const useGameEngine = () => {
       gameTime: gameState.current.gameTime,
       language: gameState.current.language,
       flashMessageKey: null,
-      isCashingOut: false,
       hasCollectedFirstCan: playerState.hasCollectedFirstCan,
       isInventoryFull: playerState.inventory.length >= playerState.inventoryCap,
       purchasedUpgrades: playerState.upgrades,
-      speedBoostTimer: playerState.speedBoostTimer,
     });
   }
 
@@ -844,13 +841,6 @@ export const useGameEngine = () => {
           player.collectChain >= SPEED_BOOST_CHAIN_THRESHOLD
         ) {
           player.speedBoostTimer = SPEED_BOOST_DURATION;
-          state.floatingTexts.push({
-            id: effectIdCounter.current++,
-            text: 'Speed Boost!',
-            position: { ...player.position, y: player.position.y - 70 },
-            life: 1.2,
-            color: '#FFD93D',
-          });
           audioService.playBoostSound();
         }
 
@@ -887,10 +877,8 @@ export const useGameEngine = () => {
 
       if (
         state.isPlayerNearDepot &&
-        (player.inventory.length > 0 || player.stash.length > 0) &&
-        !state.isCashingOut
+        (player.inventory.length > 0 || player.stash.length > 0)
       ) {
-        state.isCashingOut = true;
         const totalItems = player.inventory.length + player.stash.length;
         const earnings =
           totalItems * COLLECTIBLE_VALUE * (player.upgrades.has('vest') ? 1.1 : 1);
@@ -935,11 +923,9 @@ export const useGameEngine = () => {
           gameTime: state.gameTime,
           language: state.language,
           flashMessageKey: state.flashMessageKey,
-          isCashingOut: state.isCashingOut,
           hasCollectedFirstCan: state.player.hasCollectedFirstCan,
           isInventoryFull: state.player.inventory.length >= state.player.inventoryCap,
           purchasedUpgrades: state.player.upgrades,
-          speedBoostTimer: state.player.speedBoostTimer,
         });
         if (state.flashMessageKey) {
           if (flashMessageTimeoutRef.current)
@@ -1050,10 +1036,6 @@ export const useGameEngine = () => {
     }
   };
 
-  const endCashingOut = () => {
-    if (gameState.current) gameState.current.isCashingOut = false;
-  };
-
   return {
     gameState,
     uiState,
@@ -1063,6 +1045,5 @@ export const useGameEngine = () => {
     toastMessage,
     clearToast,
     activateCrosswalk,
-    endCashingOut,
   };
 };

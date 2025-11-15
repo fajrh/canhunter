@@ -211,7 +211,6 @@ export interface GameState {
   traffic: TrafficVehicle[];
   npcs: NPC[];
   crosswalks: Crosswalk[];
-  isCashingOut: boolean;
   isWinter: boolean;
   dialogue: ChatBubble[];
   closestBridge: Bridge | null;
@@ -230,9 +229,7 @@ export interface UIState {
     gameTime: number;
     language: Language;
     flashMessageKey: string | null;
-    isCashingOut: boolean;
     hasCollectedFirstCan: boolean;
     isInventoryFull: boolean;
     purchasedUpgrades: Set<UpgradeId>;
-    speedBoostTimer: number;
 }

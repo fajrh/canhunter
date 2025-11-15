@@ -25,7 +25,6 @@ const CashOutAnimation = ({ onFinish }: { onFinish: () => void }) => {
   );
 };
 
-
 export default function App() {
   const [isUpgradesOpen, setIsUpgradesOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -40,7 +39,6 @@ export default function App() {
     toastMessage,
     clearToast,
     activateCrosswalk,
-    endCashingOut,
   } = useGameEngine();
 
   const handleToggleMute = () => {
@@ -56,22 +54,31 @@ export default function App() {
 
   // The game engine is not ready on the first render
   if (!uiState) {
-    return <div className="w-full h-full bg-gray-800 flex items-center justify-center text-white">Loading...</div>;
+    return (
+      <div className="w-full h-full bg-gray-800 flex items-center justify-center text-white">
+        Loading...
+      </div>
+    );
   }
 
   return (
     <div className="w-full h-full bg-gray-800 text-white font-sans select-none touch-callout-none">
-      {!uiState.hasCollectedFirstCan && <GameMessage text={t('intro_prompt', uiState.language)} />}
-      {uiState.isInventoryFull && uiState.hasCollectedFirstCan && (
-        <InventoryFullPrompt text={t('inventory_full_prompt', uiState.language)} />
+      {!uiState.hasCollectedFirstCan && (
+        <GameMessage text={t('intro_prompt', uiState.language)} />
       )}
-      
-      <FlashMessage messageKey={uiState.flashMessageKey} language={uiState.language} />
 
-      <GameCanvas
-        gameStateRef={gameState}
-        onSetTargetPosition={setTargetPosition}
+      {uiState.isInventoryFull && uiState.hasCollectedFirstCan && (
+        <InventoryFullPrompt
+          text={t('inventory_full_prompt', uiState.language)}
+        />
+      )}
+
+      <FlashMessage
+        messageKey={uiState.flashMessageKey}
+        language={uiState.language}
       />
+
+      <GameCanvas gameStateRef={gameState} onSetTargetPosition={setTargetPosition} />
 
       <Hud
         money={uiState.money}
@@ -84,7 +91,6 @@ export default function App() {
         maxHp={uiState.maxHp}
         stashCount={uiState.stashCount}
         stashCap={uiState.stashCap}
-        speedBoostTimer={uiState.speedBoostTimer}
       />
 
       <Controls
@@ -108,12 +114,17 @@ export default function App() {
       )}
 
       {isHelpOpen && (
-          <HelpModal onClose={() => setIsHelpOpen(false)} language={uiState.language} />
+        <HelpModal
+          onClose={() => setIsHelpOpen(false)}
+          language={uiState.language}
+        />
       )}
 
-      {uiState.isCashingOut && <CashOutAnimation onFinish={endCashingOut} />}
-
-      <Toast messageKey={toastMessage} onDismiss={clearToast} language={uiState.language} />
+      <Toast
+        messageKey={toastMessage}
+        onDismiss={clearToast}
+        language={uiState.language}
+      />
     </div>
   );
 }

@@ -140,6 +140,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   });
   const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
 
+  // --- Asset loading (cans, critters, road tile, landmark sprites) ---
   useEffect(() => {
     const landmarkSpriteUrls = Object.values(LANDMARK_SPRITE_URLS);
     const imagesToLoad = Array.from(
@@ -170,6 +171,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           total: imagesToLoad.length,
         });
         if (loadedCount === imagesToLoad.length) {
+          // Small delay so the bar animates
           setTimeout(() => setAllAssetsLoaded(true), 500);
         }
       };
@@ -580,9 +582,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       }
 
-      // Crosswalks (you can flesh this out later)
+      // Crosswalks (placeholder)
       crosswalks.forEach((_cw) => {
-        // draw crosswalk stripes if you want
+        // draw crosswalk stripes if you want later
       });
 
       // --- Foliage (under landmarks / cans) ---
