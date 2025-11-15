@@ -21,8 +21,6 @@ const CashOutAnimation = ({ onFinish }: { onFinish: () => void }) => {
   return (
     <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-50 text-white text-center">
       <div className="text-6xl animate-bounce">🚲</div>
-      <p className="text-2xl font-bold mt-4">Crossing bridge to Québec...</p>
-      <p className="text-lg">Cashing in!</p>
     </div>
   );
 };
