@@ -216,8 +216,7 @@ export const BRIDGES: Bridge[] = [
     nameKey: 'bridge_alexandra',
     from: { x: 2300, y: 1500 },
     to: { x: 2300, y: 900 },
-    rect: [2265, 1100, 70, 150],
-    repairGag: true
+    rect: [2265, 1100, 70, 150]
   },
   {
     name: 'Portage Bridge',

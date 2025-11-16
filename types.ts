@@ -216,6 +216,8 @@ export interface GameState {
   isWinter: boolean;
   dialogue: ChatBubble[];
   closestBridge: Bridge | null;
+  isDepositing: boolean;
+  sellCooldown: number;
 }
 
 // Separate state for UI to avoid re-rendering the whole app on every frame

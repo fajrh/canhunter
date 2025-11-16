@@ -135,8 +135,6 @@ const resolvePath = (start: Vector2, destination: Vector2, bridges: Bridge[]): V
   let bestCost = Infinity;
 
   bridges.forEach((bridge) => {
-    if (bridge.repairGag) return;
-
     const [bx, by, bw, bh] = bridge.rect;
     const centerX = bx + bw / 2;
     const centerY = by + bh / 2;
@@ -502,6 +500,8 @@ export const useGameEngine = () => {
       isWinter: true,
       dialogue: [],
       closestBridge: null,
+      isDepositing: false,
+      sellCooldown: 0,
     };
 
     // Top up initial collectibles if save is empty / light
@@ -823,7 +823,6 @@ export const useGameEngine = () => {
         let closestBridge: Bridge | null = null;
         let minD = Infinity;
         BRIDGES.forEach((b) => {
-          if (b.repairGag) return;
           const midPoint = {
             x: b.rect[0] + b.rect[2] / 2,
             y: b.rect[1] + b.rect[3] / 2,
@@ -962,14 +961,53 @@ export const useGameEngine = () => {
         state.isPlayerNearDepot &&
         (player.inventory.length > 0 || player.stash.length > 0)
       ) {
-        const totalItems = player.inventory.length + player.stash.length;
-        const earnings =
-          totalItems * COLLECTIBLE_VALUE * (player.upgrades.has('vest') ? 1.1 : 1);
-        player.money += earnings;
-        player.inventory = [];
-        player.stash = [];
-        audioService.playSellSound();
+        if (!state.isDepositing) {
+          state.isDepositing = true;
+          audioService.playSellSound();
+        }
+
+        state.sellCooldown -= deltaTime;
+        while (
+          state.sellCooldown <= 0 &&
+          (player.inventory.length > 0 || player.stash.length > 0)
+        ) {
+          const source = player.inventory.length > 0 ? player.inventory : player.stash;
+          const sold = source.shift();
+          if (!sold) break;
+
+          const id = state.flyingCanIdCounter++;
+          state.flyingCans.push({
+            id,
+            start: { ...player.position },
+            end: { ...REFUND_DEPOT_POSITION },
+            progress: 0,
+            imageUrl: sold.imageUrl,
+            emoji: sold.emoji,
+          });
+
+          const payout =
+            COLLECTIBLE_VALUE * (player.upgrades.has('vest') ? 1.1 : 1);
+          player.money += payout;
+          state.lastSellTime = state.gameTime;
+          state.sellCooldown += 0.05;
+        }
+
+        if (player.inventory.length === 0 && player.stash.length === 0) {
+          state.isDepositing = false;
+          state.sellCooldown = 0;
+        }
+      } else {
+        state.isDepositing = false;
+        state.sellCooldown = 0;
       }
+
+      // Animate flying cans to depot
+      state.flyingCans = state.flyingCans
+        .map((can) => ({
+          ...can,
+          progress: can.progress + deltaTime * 3,
+        }))
+        .filter((can) => can.progress < 1.05);
 
       // Floating texts & click markers
       state.floatingTexts = state.floatingTexts
@@ -1044,16 +1082,6 @@ export const useGameEngine = () => {
     (position: Vector2, isBridgeClick: boolean = false) => {
       const state = gameState.current;
       if (!state) return;
-
-      if (!isBridgeClick) {
-        const targetBridge = state.bridges.find(
-          (b) => b.repairGag && isPointInRect(position, b.rect),
-        );
-        if (targetBridge) {
-          setToast('toast_detour', 4000);
-          return;
-        }
-      }
 
       const path = resolvePath(state.player.position, position, state.bridges);
       if (!path || path.length === 0) {

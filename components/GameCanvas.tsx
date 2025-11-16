@@ -24,6 +24,7 @@ import {
   SPRITE_OC_TRANSPO_BUS_URL,
   PLAYER_RUN_SPRITES,
   PLAYER_IDLE_SPRITES,
+  REFUND_DEPOT_POSITION,
 } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
@@ -139,6 +140,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   const groundPatternRef = useRef<CanvasPattern | null>(null);
   const roadPatternCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const roadPatternRef = useRef<CanvasPattern | null>(null);
+  const touchDirectionRef = useRef<Vector2 | null>(null);
+  const touchIntervalRef = useRef<number | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
 
   const [loadedImages, setLoadedImages] = useState<
     Record<string, HTMLImageElement>
@@ -301,14 +305,97 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     roadPatternRef.current = null;
   }, [canvasSize, devicePixelRatio]);
 
+  useEffect(() => () => stopTouchMovement(), []);
+
+  const updateTouchDirection = (worldPos: Vector2) => {
+    const { player } = gameStateRef.current;
+    const dx = worldPos.x - player.position.x;
+    const dy = worldPos.y - player.position.y;
+    const len = Math.hypot(dx, dy) || 1;
+    touchDirectionRef.current = { x: dx / len, y: dy / len };
+    const target = {
+      x: player.position.x + touchDirectionRef.current.x * 800,
+      y: player.position.y + touchDirectionRef.current.y * 800,
+    };
+    onSetTargetPosition(target);
+  };
+
+  const stopTouchMovement = () => {
+    if (touchIntervalRef.current) {
+      window.clearInterval(touchIntervalRef.current);
+      touchIntervalRef.current = null;
+    }
+    touchDirectionRef.current = null;
+    activePointerIdRef.current = null;
+    const state = gameStateRef.current;
+    if (state) {
+      state.player.targetPosition = null;
+      state.player.pathQueue = [];
+      state.player.velocity = { x: 0, y: 0 };
+    }
+  };
+
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const rect = canvasRef.current?.getBoundingClientRect();
     const x = e.clientX - (rect?.left ?? 0);
     const y = e.clientY - (rect?.top ?? 0);
-    onSetTargetPosition(
-      screenToWorld({ x, y }, gameStateRef.current.camera, canvasSize),
+    const worldPos = screenToWorld(
+      { x, y },
+      gameStateRef.current.camera,
+      canvasSize,
     );
+
+    if (e.pointerType === 'touch') {
+      activePointerIdRef.current = e.pointerId;
+      updateTouchDirection(worldPos);
+      if (canvasRef.current?.setPointerCapture) {
+        canvasRef.current.setPointerCapture(e.pointerId);
+      }
+      if (!touchIntervalRef.current) {
+        touchIntervalRef.current = window.setInterval(() => {
+          if (touchDirectionRef.current) {
+            const { player } = gameStateRef.current;
+            const target = {
+              x: player.position.x + touchDirectionRef.current.x * 800,
+              y: player.position.y + touchDirectionRef.current.y * 800,
+            };
+            onSetTargetPosition(target);
+          }
+        }, 80);
+      }
+    } else {
+      onSetTargetPosition(worldPos);
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType !== 'touch') return;
+    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current)
+      return;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const x = e.clientX - (rect?.left ?? 0);
+    const y = e.clientY - (rect?.top ?? 0);
+    const worldPos = screenToWorld(
+      { x, y },
+      gameStateRef.current.camera,
+      canvasSize,
+    );
+    updateTouchDirection(worldPos);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType !== 'touch') return;
+    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current)
+      return;
+    if (canvasRef.current?.releasePointerCapture) {
+      try {
+        canvasRef.current.releasePointerCapture(e.pointerId);
+      } catch (err) {
+        // ignore
+      }
+    }
+    stopTouchMovement();
   };
 
   useEffect(() => {
@@ -459,6 +546,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         closestBridge,
         collectibles,
         houses,
+        flyingCans,
+        gameTime,
       } = gameState;
 
       const dpr = devicePixelRatio;
@@ -781,6 +870,43 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fillText(obj.emoji, x, y);
       });
 
+      // --- Flying cans headed to the depot ---
+      flyingCans.forEach((can) => {
+        const progress = Math.min(1, can.progress);
+        const currentPos = {
+          x: can.start.x + (can.end.x - can.start.x) * progress,
+          y: can.start.y + (can.end.y - can.start.y) * progress,
+        };
+        if (
+          currentPos.x < viewBounds.left ||
+          currentPos.x > viewBounds.right ||
+          currentPos.y < viewBounds.top ||
+          currentPos.y > viewBounds.bottom
+        ) {
+          return;
+        }
+        const { x, y } = worldToScreen(currentPos, camera, canvasSize);
+        const img = can.imageUrl ? loadedImages[can.imageUrl] : undefined;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        if (img) {
+          const drawHeight = 28;
+          const aspectRatio = img.width / img.height;
+          const drawWidth = drawHeight * aspectRatio;
+          ctx.drawImage(img, x - drawWidth / 2, y - drawHeight / 2, drawWidth, drawHeight);
+        } else if (can.emoji) {
+          ctx.font = '22px sans-serif';
+          ctx.fillText(can.emoji, x, y);
+        } else {
+          ctx.fillStyle = '#ffd166';
+          ctx.beginPath();
+          ctx.arc(x, y, 6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+
       // Path preview
       const pathTargets: Vector2[] = [];
       if (player.targetPosition) pathTargets.push(player.targetPosition);
@@ -864,6 +990,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         camera,
         canvasSize,
       );
+      const isInventoryFull = player.inventory.length >= player.inventoryCap;
+      const depotAngle = Math.atan2(
+        REFUND_DEPOT_POSITION.y - player.position.y,
+        REFUND_DEPOT_POSITION.x - player.position.x,
+      );
       if (player.speedBoostTimer > 0) {
         const boostRatio = Math.min(
           1,
@@ -940,6 +1071,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           hpBarWidth * (player.hp / player.maxHp),
           hpBarHeight,
         );
+
+        if (isInventoryFull) {
+          const pulse = 0.35 + 0.65 * Math.abs(Math.sin(gameTime * 0.01));
+          ctx.save();
+          ctx.translate(playerScreenPos.x, playerScreenPos.y - 70);
+          ctx.rotate(depotAngle - Math.PI / 2);
+          ctx.globalAlpha = pulse;
+          ctx.font = 'bold 10px Arial';
+          ctx.fillStyle = '#fff6aa';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('^', 0, 0);
+          ctx.restore();
+        }
       }
 
       // Bridge direction hint arrow above player
@@ -951,13 +1096,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.save();
         ctx.translate(playerScreenPos.x, playerScreenPos.y - 60);
         ctx.rotate(angle + Math.PI / 2);
-        ctx.font = '24px sans-serif';
+        ctx.font = '14px sans-serif';
         ctx.fillStyle = 'rgba(255, 255, 0, 0.9)';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🔽', 0, 0);
-        ctx.font = 'bold 10pt Arial';
-        ctx.fillText(t('bridge_label', language), 0, 20);
+        ctx.font = 'bold 8pt Arial';
+        ctx.fillText(t('bridge_label', language), 0, 14);
         ctx.restore();
       }
 
@@ -1019,6 +1164,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         height={canvasSize.height}
         className="absolute top-0 left-0 w-full h-full cursor-pointer"
         onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={handlePointerUp}
       />
       {!allAssetsLoaded && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-1/2 max-w-sm pointer-events-none">
