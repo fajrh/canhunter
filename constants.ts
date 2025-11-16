@@ -410,26 +410,26 @@ export const ROADS: RoadSegment[] = [
     id: 'bridge_macdonald_cartier',
     from: { x: 3000, y: 1500 },
     to: { x: 3000, y: 900 },
-    width: 130
+    width: 130,
   },
   {
     id: 'bridge_portage',
     from: { x: 1800, y: 1500 },
     to: { x: 1800, y: 900 },
-    width: 130
+    width: 130,
   },
   {
     id: 'bridge_chaudiere',
     from: { x: 1200, y: 1500 },
     to: { x: 1200, y: 900 },
-    width: 130
+    width: 130,
   },
   {
     id: 'bridge_champlain',
     from: { x: 500, y: 1600 },
     to: { x: 500, y: 900 },
-    width: 140
-  }
+    width: 140,
+  },
 ];
 
 // Road-label text per ID (kept separate from RoadSegment type)
@@ -449,7 +449,7 @@ export const ROAD_LABELS: Record<string, string> = {
   bridge_macdonald_cartier: 'MACDONALD-CARTIER BRIDGE',
   bridge_portage: 'PORTAGE BRIDGE',
   bridge_chaudiere: 'CHAUDIÈRE CROSSING',
-  bridge_champlain: 'CHAMPLAIN BRIDGE'
+  bridge_champlain: 'CHAMPLAIN BRIDGE',
 };
 
 export const CROSSWALKS: Crosswalk[] = [

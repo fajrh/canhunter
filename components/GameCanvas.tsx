@@ -23,7 +23,7 @@ import {
   SPRITE_RECYCLE_BIN_URL,
   SPRITE_CHINATOWN_GATE_URL,
   SPRITE_STASH_HOUSE_URL,
-  SPRITE_OC_TRANSPO_BUS_URL
+  SPRITE_OC_TRANSPO_BUS_URL,
 } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
@@ -37,11 +37,11 @@ const drawChatBubble = (
   ctx: CanvasRenderingContext2D,
   bubble: ChatBubble,
   camera: Vector2,
-  canvasSize: { width: number; height: number }
+  canvasSize: { width: number; height: number },
 ) => {
   const pos = {
     x: bubble.position.x - camera.x + canvasSize.width / 2,
-    y: bubble.position.y - camera.y + canvasSize.height / 2
+    y: bubble.position.y - camera.y + canvasSize.height / 2,
   };
 
   const bubbleX = pos.x - bubble.width / 2;
@@ -59,14 +59,14 @@ const drawChatBubble = (
     bubbleX + bubble.width,
     bubbleY,
     bubbleX + bubble.width,
-    bubbleY + 10
+    bubbleY + 10,
   );
   ctx.lineTo(bubbleX + bubble.width, bubbleY + bubble.height - 10);
   ctx.quadraticCurveTo(
     bubbleX + bubble.width,
     bubbleY + bubble.height,
     bubbleX + bubble.width - 10,
-    bubbleY + bubble.height
+    bubbleY + bubble.height,
   );
   ctx.lineTo(pos.x + 5, bubbleY + bubble.height);
   ctx.lineTo(pos.x, bubbleY + bubble.height + 10);
@@ -76,7 +76,7 @@ const drawChatBubble = (
     bubbleX,
     bubbleY + bubble.height,
     bubbleX,
-    bubbleY + bubble.height - 10
+    bubbleY + bubble.height - 10,
   );
   ctx.lineTo(bubbleX, bubbleY + 10);
   ctx.quadraticCurveTo(bubbleX, bubbleY, bubbleX + 10, bubbleY);
@@ -94,7 +94,7 @@ const drawChatBubble = (
     ctx.fillText(
       bubble.lines[i],
       bubbleX + bubble.width / 2,
-      bubbleY + 10 + i * lineHeight
+      bubbleY + 10 + i * lineHeight,
     );
   }
   ctx.globalAlpha = 1;
@@ -106,7 +106,7 @@ const drawRoundedRect = (
   y: number,
   width: number,
   height: number,
-  radius: number
+  radius: number,
 ) => {
   const r = Math.min(radius, width / 2, height / 2);
   ctx.beginPath();
@@ -124,15 +124,15 @@ const drawRoundedRect = (
 
 const GameCanvas: React.FC<GameCanvasProps> = ({
   gameStateRef,
-  onSetTargetPosition
+  onSetTargetPosition,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvasSize, setCanvasSize] = useState({
     width: window.innerWidth,
-    height: window.innerHeight
+    height: window.innerHeight,
   });
   const [devicePixelRatio, setDevicePixelRatio] = useState(
-    window.devicePixelRatio || 1
+    window.devicePixelRatio || 1,
   );
   const waterFxRef = useRef<WaterFX | null>(null);
   const patternCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -145,14 +145,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   >({});
   const [loadingProgress, setLoadingProgress] = useState({
     loaded: 0,
-    total: 1
+    total: 1,
   });
   const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
 
   // --- Asset loading (cans, critters, road tile, landmark images, extra sprites) ---
   useEffect(() => {
     const landmarkImageUrls = LANDMARKS.filter(
-      (landmark) => Boolean(landmark.imageUrl)
+      (landmark) => Boolean(landmark.imageUrl),
     ).map((landmark) => landmark.imageUrl!);
 
     const extraSpriteUrls = [
@@ -160,7 +160,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       SPRITE_RECYCLE_BIN_URL,
       SPRITE_CHINATOWN_GATE_URL,
       SPRITE_STASH_HOUSE_URL,
-      SPRITE_OC_TRANSPO_BUS_URL
+      SPRITE_OC_TRANSPO_BUS_URL,
     ];
 
     const imagesToLoad = Array.from(
@@ -172,8 +172,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ROAD_TEXTURE_URL,
         GROUND_TEXTURE_URL,
         WATER_TILE_URL,
-        ...DETAIL_TEXTURE_URLS
-      ])
+        ...DETAIL_TEXTURE_URLS,
+      ]),
     );
     let loadedCount = 0;
     setLoadingProgress({ loaded: 0, total: imagesToLoad.length });
@@ -192,7 +192,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         loadedCount++;
         setLoadingProgress({
           loaded: loadedCount,
-          total: imagesToLoad.length
+          total: imagesToLoad.length,
         });
         if (loadedCount === imagesToLoad.length) {
           // small delay so the bar animates
@@ -204,7 +204,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         loadedCount++;
         setLoadingProgress({
           loaded: loadedCount,
-          total: imagesToLoad.length
+          total: imagesToLoad.length,
         });
         if (loadedCount === imagesToLoad.length) {
           setTimeout(() => setAllAssetsLoaded(true), 500);
@@ -218,19 +218,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   const worldToScreen = (
     pos: Vector2,
     camera: Vector2,
-    canvasDim: { width: number; height: number }
+    canvasDim: { width: number; height: number },
   ): Vector2 => ({
     x: pos.x - camera.x + canvasDim.width / 2,
-    y: pos.y - camera.y + canvasDim.height / 2
+    y: pos.y - camera.y + canvasDim.height / 2,
   });
 
   const screenToWorld = (
     pos: Vector2,
     camera: Vector2,
-    canvasDim: { width: number; height: number }
+    canvasDim: { width: number; height: number },
   ): Vector2 => ({
     x: pos.x + camera.x - canvasDim.width / 2,
-    y: pos.y + camera.y - canvasDim.height / 2
+    y: pos.y + camera.y - canvasDim.height / 2,
   });
 
   useEffect(() => {
@@ -240,7 +240,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     };
     window.addEventListener('resize', handleResize);
     const mediaQuery = window.matchMedia(
-      `(resolution: ${window.devicePixelRatio || 1}dppx)`
+      `(resolution: ${window.devicePixelRatio || 1}dppx)`,
     );
     const handleDprChange = () =>
       setDevicePixelRatio(window.devicePixelRatio || 1);
@@ -274,7 +274,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     const x = e.clientX - (rect?.left ?? 0);
     const y = e.clientY - (rect?.top ?? 0);
     onSetTargetPosition(
-      screenToWorld({ x, y }, gameStateRef.current.camera, canvasSize)
+      screenToWorld({ x, y }, gameStateRef.current.camera, canvasSize),
     );
   };
 
@@ -309,7 +309,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               0,
               0,
               patternCanvas.width,
-              patternCanvas.height
+              patternCanvas.height,
             );
 
             // Very subtle dark vignette toward corners to keep focus in the middle
@@ -319,7 +319,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               0,
               256,
               256,
-              360
+              360,
             );
             vignette.addColorStop(0, 'rgba(0,0,0,0)');
             vignette.addColorStop(1, 'rgba(0,0,0,0.14)');
@@ -332,7 +332,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           groundPatternRef.current = null;
         }
       } else if (!patternCanvasRef.current) {
-        // Fallback: painted gradient, used only if tile not loaded yet
+        // Fallback: your original painted gradient, used only if tile not loaded yet
         const patternCanvas = document.createElement('canvas');
         patternCanvas.width = patternCanvas.height = 256;
         const pctx = patternCanvas.getContext('2d');
@@ -351,7 +351,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               Math.random() * 256,
               size,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             pctx.fill();
           }
@@ -370,7 +370,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       if (patternCanvasRef.current && !groundPatternRef.current) {
         groundPatternRef.current = ctx.createPattern(
           patternCanvasRef.current,
-          'repeat'
+          'repeat',
         );
       }
       return groundPatternRef.current;
@@ -393,7 +393,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       if (!roadPatternRef.current) {
         roadPatternRef.current = ctx.createPattern(
           roadPatternCanvasRef.current,
-          'repeat'
+          'repeat',
         );
       }
       return roadPatternRef.current;
@@ -426,7 +426,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         dialogue,
         closestBridge,
         collectibles,
-        houses
+        houses,
       } = gameState;
 
       const dpr = devicePixelRatio;
@@ -442,7 +442,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         left: camera.x - canvasSize.width / 2 - CULL_MARGIN,
         right: camera.x + canvasSize.width / 2 + CULL_MARGIN,
         top: camera.y - canvasSize.height / 2 - CULL_MARGIN,
-        bottom: camera.y + canvasSize.height / 2 + CULL_MARGIN
+        bottom: camera.y + canvasSize.height / 2 + CULL_MARGIN,
       };
 
       const waterFx = waterFxRef.current!;
@@ -506,7 +506,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         // Road label (Ontario guide-sign style)
         const midWorld: Vector2 = {
           x: (road.from.x + road.to.x) / 2,
-          y: (road.from.y + road.to.y) / 2
+          y: (road.from.y + road.to.y) / 2,
         };
         const midScreen = worldToScreen(midWorld, camera, canvasSize);
         const labelText =
@@ -540,12 +540,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // Subtle vertical vignette
       ctx.save();
-      const vignette = ctx.createLinearGradient(
-        0,
-        0,
-        0,
-        canvasSize.height
-      );
+      const vignette = ctx.createLinearGradient(0, 0, 0, canvasSize.height);
       vignette.addColorStop(0, 'rgba(0,0,0,0.18)');
       vignette.addColorStop(0.3, 'rgba(0,0,0,0)');
       vignette.addColorStop(0.7, 'rgba(0,0,0,0)');
@@ -560,12 +555,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const borderStartScreen = worldToScreen(
           { x: -100, y: borderY },
           camera,
-          canvasSize
+          canvasSize,
         );
         const borderEndScreen = worldToScreen(
           { x: GAME_WORLD_SIZE.width + 100, y: borderY },
           camera,
-          canvasSize
+          canvasSize,
         );
         ctx.save();
         ctx.beginPath();
@@ -586,7 +581,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const { x, y } = worldToScreen(
           { x: b.rect[0], y: b.rect[1] },
           camera,
-          canvasSize
+          canvasSize,
         );
         const width = b.rect[2];
         const height = b.rect[3];
@@ -616,12 +611,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const topLeft = worldToScreen(
           { x: bx, y: by },
           camera,
-          canvasSize
+          canvasSize,
         );
         const bottomRight = worldToScreen(
           { x: bx + bw, y: by + bh },
           camera,
-          canvasSize
+          canvasSize,
         );
         const width = bottomRight.x - topLeft.x;
         const height = bottomRight.y - topLeft.y;
@@ -650,7 +645,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fillText(
           `${t('bridge_label', language)}: ${bridgeName}`,
           labelX + labelWidth / 2,
-          labelY + 24
+          labelY + 24,
         );
         ctx.restore();
       }
@@ -702,7 +697,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
             screenPos.x - targetWidth / 2,
             screenPos.y - targetHeight,
             targetWidth,
-            targetHeight
+            targetHeight,
           );
         } else if (lm.emoji) {
           ctx.font = '36px sans-serif';
@@ -745,7 +740,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               x - drawWidth / 2,
               y - drawHeight,
               drawWidth,
-              drawHeight
+              drawHeight,
             );
             return;
           }
@@ -792,7 +787,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fillText(e.emoji, x, y);
       });
 
-      // Depot + stash icons (use sprite for stash house if available)
+      // Depot + stash icons (use sprite for stash house)
       const depotScreenPos = worldToScreen(refundDepot, camera, canvasSize);
       ctx.font = '80px sans-serif';
       ctx.textAlign = 'center';
@@ -810,7 +805,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           stashScreenPos.x - targetWidth / 2,
           stashScreenPos.y - targetHeight,
           targetWidth,
-          targetHeight
+          targetHeight,
         );
       } else {
         ctx.fillText('📦', stashScreenPos.x, stashScreenPos.y);
@@ -836,12 +831,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       const playerScreenPos = worldToScreen(
         player.position,
         camera,
-        canvasSize
+        canvasSize,
       );
       if (player.speedBoostTimer > 0) {
         const boostRatio = Math.min(
           1,
-          player.speedBoostTimer / SPEED_BOOST_DURATION
+          player.speedBoostTimer / SPEED_BOOST_DURATION,
         );
         ctx.save();
         ctx.globalAlpha = 0.35 + 0.15 * Math.sin(time / 120);
@@ -852,7 +847,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           playerScreenPos.y - 12,
           38 + boostRatio * 24,
           0,
-          Math.PI * 2
+          Math.PI * 2,
         );
         ctx.fill();
         ctx.restore();
@@ -866,7 +861,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fillText(
           player.upgrades.has('bicycle') ? '🚴' : '🧍',
           playerScreenPos.x,
-          playerScreenPos.y
+          playerScreenPos.y,
         );
         const hpBarWidth = 40;
         const hpBarHeight = 5;
@@ -880,7 +875,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           hpBarX,
           hpBarY,
           hpBarWidth * (player.hp / player.maxHp),
-          hpBarHeight
+          hpBarHeight,
         );
       }
 
@@ -888,7 +883,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       if (closestBridge) {
         const angle = Math.atan2(
           closestBridge.from.y - player.position.y,
-          closestBridge.from.x - player.position.x
+          closestBridge.from.x - player.position.x,
         );
         ctx.save();
         ctx.translate(playerScreenPos.x, playerScreenPos.y - 60);
@@ -908,7 +903,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const { x, y } = worldToScreen(
           text.position,
           camera,
-          canvasSize
+          canvasSize,
         );
         ctx.save();
         ctx.font = 'bold 18px sans-serif';
@@ -926,7 +921,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const { x, y } = worldToScreen(
           marker.position,
           camera,
-          canvasSize
+          canvasSize,
         );
         ctx.globalAlpha = marker.life;
         ctx.strokeStyle = '#FFFF00';
@@ -943,7 +938,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // NPC dialogue bubbles
       dialogue.forEach((bubble) =>
-        drawChatBubble(ctx, bubble, camera, canvasSize)
+        drawChatBubble(ctx, bubble, camera, canvasSize),
       );
 
       animationFrameId = requestAnimationFrame(render);
@@ -965,10 +960,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       {!allAssetsLoaded && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-1/2 max-w-sm pointer-events-none">
           <p className="text-white text-center text-sm text-outline">
-            {t(
-              'loading_assets',
-              gameStateRef.current?.language || 'en'
-            )}
+            {t('loading_assets', gameStateRef.current?.language || 'en')}
           </p>
           <div className="w-full bg-gray-600 rounded-full h-2.5 mt-1 border-2 border-white/50">
             <div
@@ -977,7 +969,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                 width: `${
                   (loadingProgress.loaded / loadingProgress.total) * 100
                 }%`,
-                transition: 'width 0.2s'
+                transition: 'width 0.2s',
               }}
             ></div>
           </div>
