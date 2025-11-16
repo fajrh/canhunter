@@ -60,6 +60,9 @@ import {
   BRIDGE_PATH_SAMPLES,
   BRIDGE_SNAP_PADDING,
   GAME_WORLD_SIZE,
+  RECYCLING_BIN_BONUS_ITEMS,
+  RECYCLING_BIN_SPAWN_CHANCE,
+  SPRITE_RECYCLE_BIN_URL,
 } from '../constants.ts';
 import { audioService } from '../services/audioService.ts';
 import { saveService } from '../services/saveService.ts';
@@ -234,13 +237,17 @@ const spawnCollectibleAt = (
   idCounter: MutableRefObject<number>,
   spawnTime: number,
 ) => {
+  const isBin = Math.random() < RECYCLING_BIN_SPAWN_CHANCE;
+  const type = isBin ? 'bin' : Math.random() < 0.75 ? 'can' : 'bottle';
   const collectible: Collectible = {
     id: idCounter.current++,
-    type: Math.random() < 0.75 ? 'can' : 'bottle',
+    type,
     position,
-    emoji: '🥫',
+    emoji: isBin ? '♻️' : '🥫',
     spawnTime,
-    imageUrl: CAN_IMAGE_URLS[Math.floor(Math.random() * CAN_IMAGE_URLS.length)],
+    imageUrl: isBin
+      ? SPRITE_RECYCLE_BIN_URL
+      : CAN_IMAGE_URLS[Math.floor(Math.random() * CAN_IMAGE_URLS.length)],
   };
   state.collectibles.push(collectible);
 };
@@ -780,17 +787,7 @@ export const useGameEngine = () => {
             y: zy + Math.random() * zh,
           };
           if (!isPointInWater(position)) {
-            const type = Math.random() < 0.7 ? 'can' : 'bottle';
-            const imageUrl =
-              CAN_IMAGE_URLS[Math.floor(Math.random() * CAN_IMAGE_URLS.length)];
-            state.collectibles.push({
-              id: collectibleIdCounter.current++,
-              type,
-              position,
-              emoji: '🥫',
-              spawnTime: state.gameTime,
-              imageUrl,
-            });
+            spawnCollectibleAt(state, position, collectibleIdCounter, state.gameTime);
           }
         }
       }
@@ -812,42 +809,71 @@ export const useGameEngine = () => {
       });
 
       if (collectedToday.length > 0) {
-        if (!player.hasCollectedFirstCan) player.hasCollectedFirstCan = true;
-        player.inventory.push(...collectedToday.map((c) => c.collectible));
-        if (typeof navigator.vibrate === 'function') navigator.vibrate(50);
-        audioService.playPickupSound();
-        const newText: FloatingText = {
-          id: effectIdCounter.current++,
-          text: `+${(collectedToday.length * COLLECTIBLE_VALUE * 100).toFixed(0)}¢`,
-          position: { ...player.position, y: player.position.y - 40 },
-          life: 1.0,
-          color: '#39FF14',
-        };
-        state.floatingTexts.push(newText);
+        const collectedForInventory: { collectible: Collectible; zone?: Zone }[] = [];
+        let remainingCapacity = player.inventoryCap - player.inventory.length;
 
-        const now = state.gameTime;
-        if (now - player.lastCollectTime < SPEED_BOOST_CHAIN_WINDOW) {
-          player.collectChain += collectedToday.length;
-        } else {
-          player.collectChain = collectedToday.length;
-        }
-        player.lastCollectTime = now;
+        const makeBonusCan = (position: Vector2): Collectible => ({
+          id: collectibleIdCounter.current++,
+          type: 'can',
+          position: { ...position },
+          emoji: '🥫',
+          spawnTime: state.gameTime,
+          imageUrl: CAN_IMAGE_URLS[Math.floor(Math.random() * CAN_IMAGE_URLS.length)],
+        });
 
-        if (
-          collectedToday.length >= SPEED_BOOST_BATCH_TRIGGER ||
-          player.collectChain >= SPEED_BOOST_CHAIN_THRESHOLD
-        ) {
-          player.speedBoostTimer = SPEED_BOOST_DURATION;
-          audioService.playBoostSound();
-        }
+        collectedToday.forEach(({ collectible, zone }) => {
+          if (remainingCapacity <= 0) return;
 
-        if (state.activeQuest) {
-          const questItems = collectedToday.filter(
-            (c) =>
-              !state.activeQuest!.targetZone ||
-              c.zone?.name === state.activeQuest!.targetZone,
-          );
-          state.activeQuest.progress += questItems.length;
+          if (collectible.type === 'bin') {
+            const bonusCount = Math.max(1, RECYCLING_BIN_BONUS_ITEMS);
+            for (let i = 0; i < bonusCount && remainingCapacity > 0; i++) {
+              collectedForInventory.push({ collectible: makeBonusCan(collectible.position), zone });
+              remainingCapacity--;
+            }
+          } else {
+            collectedForInventory.push({ collectible, zone });
+            remainingCapacity--;
+          }
+        });
+
+        if (collectedForInventory.length > 0) {
+          if (!player.hasCollectedFirstCan) player.hasCollectedFirstCan = true;
+          player.inventory.push(...collectedForInventory.map((c) => c.collectible));
+          if (typeof navigator.vibrate === 'function') navigator.vibrate(50);
+          audioService.playPickupSound();
+          const newText: FloatingText = {
+            id: effectIdCounter.current++,
+            text: `+${(collectedForInventory.length * COLLECTIBLE_VALUE * 100).toFixed(0)}¢`,
+            position: { ...player.position, y: player.position.y - 40 },
+            life: 1.0,
+            color: '#39FF14',
+          };
+          state.floatingTexts.push(newText);
+
+          const now = state.gameTime;
+          if (now - player.lastCollectTime < SPEED_BOOST_CHAIN_WINDOW) {
+            player.collectChain += collectedForInventory.length;
+          } else {
+            player.collectChain = collectedForInventory.length;
+          }
+          player.lastCollectTime = now;
+
+          if (
+            collectedForInventory.length >= SPEED_BOOST_BATCH_TRIGGER ||
+            player.collectChain >= SPEED_BOOST_CHAIN_THRESHOLD
+          ) {
+            player.speedBoostTimer = SPEED_BOOST_DURATION;
+            audioService.playBoostSound();
+          }
+
+          if (state.activeQuest) {
+            const questItems = collectedForInventory.filter(
+              (c) =>
+                !state.activeQuest!.targetZone ||
+                c.zone?.name === state.activeQuest!.targetZone,
+            );
+            state.activeQuest.progress += questItems.length;
+          }
         }
       }
 

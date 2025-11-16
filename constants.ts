@@ -65,6 +65,8 @@ export const PLAYER_RADIUS = 30;
 export const COLLECTIBLE_RADIUS = 20;
 export const COLLECTIBLE_LIFESPAN = 10 * 60 * 1000; // 10 minutes
 export const COLLECTIBLE_VALUE = 0.1; // $0.10
+export const RECYCLING_BIN_BONUS_ITEMS = 6; // bins grant multiple cans
+export const RECYCLING_BIN_SPAWN_CHANCE = 0.08; // chance a spawn becomes a bin
 export const SPEED_BOOST_CHAIN_WINDOW = 5000; // ms to maintain chain
 export const SPEED_BOOST_CHAIN_THRESHOLD = 5; // items in chain to trigger boost
 export const SPEED_BOOST_BATCH_TRIGGER = 3; // items grabbed at once to trigger boost
@@ -297,7 +299,6 @@ export const LANDMARKS: Landmark[] = [
 
   // Ottawa Police cruiser parked just off Elgin/Wellington
   {
-    nameKey: 'landmark_ottawa_police',
     position: { x: 1950, y: 2150 },
     emoji: '🚓',
     imageUrl: SPRITE_POLICE_CAR_URL
@@ -305,7 +306,6 @@ export const LANDMARKS: Landmark[] = [
 
   // OC Transpo bus on Bank near Somerset
   {
-    nameKey: 'landmark_oc_transpo',
     position: { x: 1750, y: 2850 },
     emoji: '🚌',
     imageUrl: SPRITE_OC_TRANSPO_BUS_URL
@@ -313,7 +313,6 @@ export const LANDMARKS: Landmark[] = [
 
   // Blue bin cluster near your stash / Centretown houses
   {
-    nameKey: 'landmark_recycling_drop',
     position: { x: 1800, y: 3650 },
     emoji: '♻️',
     imageUrl: SPRITE_RECYCLE_BIN_URL
@@ -321,7 +320,6 @@ export const LANDMARKS: Landmark[] = [
 
   // Stash house sprite in Centretown/Glebe border
   {
-    nameKey: 'landmark_stash_house',
     position: { x: 1800, y: 3700 }, // matches STASH_HOUSE_POSITION
     emoji: '🏚️',
     imageUrl: SPRITE_STASH_HOUSE_URL

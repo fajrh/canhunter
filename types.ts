@@ -90,7 +90,7 @@ export type Bridge = {
 };
 
 export type Landmark = {
-  nameKey: string;
+  nameKey?: string;
   position: Vector2;
   emoji?: string;
   imageUrl?: string;
