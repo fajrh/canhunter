@@ -78,7 +78,10 @@ export default function App() {
         language={uiState.language}
       />
 
-      <GameCanvas gameStateRef={gameState} onSetTargetPosition={setTargetPosition} />
+      <GameCanvas
+        gameStateRef={gameState}
+        onSetTargetPosition={setTargetPosition}
+      />
 
       <Hud
         money={uiState.money}

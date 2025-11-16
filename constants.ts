@@ -1,4 +1,3 @@
-// constants.ts
 import type {
   Zone,
   Upgrade,
@@ -216,20 +215,55 @@ export const BRIDGES: Bridge[] = [
 // --- Landmarks ---
 // Positions are approximate but keep real relative layout: Parliament / ByWard / uOttawa / Lansdowne / Dow's Lake…
 export const LANDMARKS: Landmark[] = [
-  { nameKey: 'landmark_parliament', position: { x: 1800, y: 2000 }, emoji: '🏛️' },
-  { nameKey: 'landmark_byward_market', position: { x: 2600, y: 2200 }, emoji: '🥖' },
-  { nameKey: 'landmark_national_gallery', position: { x: 2300, y: 1800 }, emoji: '🖼️' },
-  { nameKey: 'landmark_rideau_centre', position: { x: 2250, y: 2150 }, emoji: '🛍️' },
-  { nameKey: 'landmark_shaw_centre', position: { x: 2300, y: 2200 }, emoji: '🏢' },
-  { nameKey: 'landmark_uottawa', position: { x: 2350, y: 2450 }, emoji: '🎓' },
-  { nameKey: 'landmark_confederation_park', position: { x: 2000, y: 2300 }, emoji: '🌳' },
-  { nameKey: 'landmark_lansdowne', position: { x: 1800, y: 4200 }, emoji: '🏟️' },
-  { nameKey: 'landmark_dows_lake', position: { x: 1500, y: 4600 }, emoji: '🛶' },
-  { nameKey: 'landmark_little_italy', position: { x: 1450, y: 4100 }, emoji: '🍝' },
-  { nameKey: 'landmark_hintonburg', position: { x: 800, y: 2900 }, emoji: '☕' },
-  { nameKey: 'landmark_westboro', position: { x: 300, y: 2800 }, emoji: '🛍️' },
-  { nameKey: 'landmark_war_museum', position: { x: 1400, y: 2050 }, emoji: '🪖' },
-  { nameKey: 'landmark_supreme_court', position: { x: 1600, y: 2050 }, emoji: '⚖️' },
+  {
+    nameKey: 'landmark_parliament',
+    position: { x: 1900, y: 2000 },
+    emoji: '🏛️',
+    imageUrl: 'https://i.ibb.co/W4BCC2n2/Chat-GPT-Image-Nov-15-2025-01-15-40-PM.png'
+  },
+  {
+    nameKey: 'landmark_byward_market',
+    position: { x: 2600, y: 2100 },
+    emoji: '🥖',
+    imageUrl: 'https://i.ibb.co/G4LPyyz0/Chat-GPT-Image-Nov-15-2025-01-18-37-PM.png'
+  },
+  {
+    nameKey: 'landmark_national_gallery',
+    position: { x: 2250, y: 1850 },
+    emoji: '🖼️',
+    imageUrl: 'https://i.ibb.co/fVcTMqxR/Chat-GPT-Image-Nov-15-2025-01-20-46-PM.png'
+  },
+  {
+    nameKey: 'landmark_rideau_centre',
+    position: { x: 2250, y: 2200 },
+    emoji: '🛍️',
+    imageUrl: 'https://i.ibb.co/QjPjWrR5/Chat-GPT-Image-Nov-15-2025-01-22-36-PM.png'
+  },
+  {
+    nameKey: 'landmark_shaw_centre',
+    position: { x: 2320, y: 2220 },
+    emoji: '🏢',
+    imageUrl: 'https://i.ibb.co/pBPfQnWM/Chat-GPT-Image-Nov-15-2025-01-24-29-PM.png'
+  },
+  {
+    nameKey: 'landmark_uottawa',
+    position: { x: 2450, y: 2450 },
+    emoji: '🎓',
+    imageUrl: 'https://i.ibb.co/1fm6jy7F/Chat-GPT-Image-Nov-15-2025-01-26-41-PM.png'
+  },
+  {
+    nameKey: 'landmark_confederation_park',
+    position: { x: 2050, y: 2250 },
+    emoji: '🌳',
+    imageUrl: 'https://i.ibb.co/k617h4FG/Chat-GPT-Image-Nov-15-2025-01-29-38-PM.png'
+  },
+  { nameKey: 'landmark_lansdowne', position: { x: 1850, y: 4300 }, emoji: '🏟️' },
+  { nameKey: 'landmark_dows_lake', position: { x: 1650, y: 4700 }, emoji: '🛶' },
+  { nameKey: 'landmark_little_italy', position: { x: 1500, y: 4100 }, emoji: '🍝' },
+  { nameKey: 'landmark_hintonburg', position: { x: 900, y: 2850 }, emoji: '☕' },
+  { nameKey: 'landmark_westboro', position: { x: 350, y: 2750 }, emoji: '🛍️' },
+  { nameKey: 'landmark_war_museum', position: { x: 1450, y: 2050 }, emoji: '🪖' },
+  { nameKey: 'landmark_supreme_court', position: { x: 1650, y: 2050 }, emoji: '⚖️' },
   { nameKey: 'landmark_chateau_laurier', position: { x: 2150, y: 2100 }, emoji: '🏰' },
   { nameKey: 'landmark_chinatown', position: { x: 1200, y: 3000 }, emoji: '🏮' },
   { nameKey: 'landmark_glebe', position: { x: 1850, y: 3800 }, emoji: '🏘️' },

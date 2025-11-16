@@ -11,10 +11,10 @@ import {
   ROADS,
   ROAD_TEXTURE_URL,
   ROAD_TILE_SIZE,
-  LANDMARK_SPRITE_URLS,
+  LANDMARKS,
   ROAD_LABELS,
-  ONTARIO_SIGN_GREEN,
-  ONTARIO_SIGN_BORDER,
+  ROAD_SIGN_GREEN,
+  ROAD_SIGN_GREEN_BORDER,
 } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
@@ -140,15 +140,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   });
   const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
 
-  // --- Asset loading (cans, critters, road tile, landmark sprites) ---
+  // --- Asset loading (cans, critters, road tile, landmark images) ---
   useEffect(() => {
-    const landmarkSpriteUrls = Object.values(LANDMARK_SPRITE_URLS);
+    const landmarkImageUrls = LANDMARKS.filter(
+      (landmark) => Boolean(landmark.imageUrl),
+    ).map((landmark) => landmark.imageUrl!);
+
     const imagesToLoad = Array.from(
       new Set([
         ...CAN_IMAGE_URLS,
+        ...landmarkImageUrls,
         CRITTER_ATLAS.image,
         ROAD_TEXTURE_URL,
-        ...landmarkSpriteUrls,
       ]),
     );
     let loadedCount = 0;
@@ -171,7 +174,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           total: imagesToLoad.length,
         });
         if (loadedCount === imagesToLoad.length) {
-          // Small delay so the bar animates
+          // small delay so the bar animates
           setTimeout(() => setAllAssetsLoaded(true), 500);
         }
       };
@@ -453,9 +456,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const signY = midScreen.y - signHeight / 2 - 8;
 
         drawRoundedRect(ctx, signX, signY, signWidth, signHeight, 4);
-        ctx.fillStyle = ONTARIO_SIGN_GREEN;
+        ctx.fillStyle = ROAD_SIGN_GREEN;
         ctx.fill();
-        ctx.strokeStyle = ONTARIO_SIGN_BORDER;
+        ctx.strokeStyle = ROAD_SIGN_GREEN_BORDER;
         ctx.lineWidth = 2;
         ctx.stroke();
 
@@ -467,12 +470,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // Subtle vertical vignette
       ctx.save();
-      const vignette = ctx.createLinearGradient(
-        0,
-        0,
-        0,
-        canvasSize.height,
-      );
+      const vignette = ctx.createLinearGradient(0, 0, 0, canvasSize.height);
       vignette.addColorStop(0, 'rgba(0,0,0,0.18)');
       vignette.addColorStop(0.3, 'rgba(0,0,0,0)');
       vignette.addColorStop(0.7, 'rgba(0,0,0,0)');
@@ -582,9 +580,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       }
 
-      // Crosswalks (placeholder)
+      // Crosswalks (placeholder for later drawing)
       crosswalks.forEach((_cw) => {
-        // draw crosswalk stripes if you want later
+        // draw crosswalk stripes later if desired
       });
 
       // --- Foliage (under landmarks / cans) ---
@@ -604,7 +602,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fillText(obj.emoji, x, y);
       });
 
-      // --- Landmarks (pixel-art sprites, under cans/NPC/player) ---
+      // --- Landmarks (using imageUrl if present, emoji fallback) ---
       landmarks.forEach((lm) => {
         if (
           lm.position.x < viewBounds.left ||
@@ -615,17 +613,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           return;
 
         const screenPos = worldToScreen(lm.position, camera, canvasSize);
-        const spriteUrl = lm.nameKey
-          ? LANDMARK_SPRITE_URLS[lm.nameKey]
-          : undefined;
-        const img = spriteUrl ? loadedImages[spriteUrl] : undefined;
+        const img = lm.imageUrl ? loadedImages[lm.imageUrl] : undefined;
 
         ctx.save();
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
 
         if (img) {
-          // Small unobtrusive pixel-art landmarks
           const targetWidth = 160;
           const targetHeight = 120;
           ctx.imageSmoothingEnabled = false;
@@ -866,7 +860,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
     animationFrameId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [gameStateRef, canvasSize, onSetTargetPosition, loadedImages, devicePixelRatio]);
+  }, [gameStateRef, canvasSize, loadedImages, devicePixelRatio]);
 
   return (
     <>
