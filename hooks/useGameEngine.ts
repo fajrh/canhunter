@@ -363,6 +363,7 @@ const getInitialPlayerState = (): PlayerState => ({
   pathQueue: [],
   speed: PLAYER_BASE_SPEED,
   velocity: { x: 0, y: 0 },
+  facing: 'right',
   inventory: [],
   inventoryCap: BASE_INVENTORY_CAP,
   money: 0,
@@ -434,6 +435,7 @@ export const useGameEngine = () => {
           ...saved.player,
           upgrades: new Set(Array.from(saved.player.upgrades)),
           hasCollectedFirstCan: saved.player.hasCollectedFirstCan || false,
+          facing: saved.player.facing || 'right',
         }
       : basePlayer;
 
@@ -593,6 +595,12 @@ export const useGameEngine = () => {
         if (Math.abs(velocity.y) < 0.02) velocity.y = 0;
         player.position.x += velocity.x * deltaTime;
         player.position.y += velocity.y * deltaTime;
+      }
+
+      if (velocity.x > 1.5) {
+        player.facing = 'right';
+      } else if (velocity.x < -1.5) {
+        player.facing = 'left';
       }
 
       if (isPointInWater(player.position) && !isPointOnBridge(player.position, state.bridges)) {

@@ -113,6 +113,23 @@ export const SPRITE_STASH_HOUSE_URL =
 export const SPRITE_OC_TRANSPO_BUS_URL =
   'https://i.ibb.co/0yJHmfHB/bus.png';
 
+export const PLAYER_RUN_SPRITES = [
+  'https://i.ibb.co/wZDRxS10/hood-run-1.png',
+  'https://i.ibb.co/gZ3dDzs8/hood-run-2.png',
+  'https://i.ibb.co/zVCnCwGt/hood-run-3.png',
+  'https://i.ibb.co/CF6MrfW/hood-run-4.png',
+  'https://i.ibb.co/9m0KwB1K/hood-run-5.png',
+  'https://i.ibb.co/N6HLRk7K/hood-run-6.png',
+];
+
+export const PLAYER_IDLE_SPRITES = [
+  'https://i.ibb.co/dw3wgpPK/hood-idle1.png',
+  'https://i.ibb.co/9kHx3sfp/hood-idle2.png',
+  'https://i.ibb.co/m53YwYdz/hood-idle3.png',
+  'https://i.ibb.co/9kHx3sfp/hood-idle2.png',
+  'https://i.ibb.co/dw3wgpPK/hood-idle1.png',
+];
+
 // --- ZONES (Areas of Ottawa) ---
 export const ZONES: Zone[] = [
   { name: 'ByWard Market', rect: [2400, 1900, 500, 500], spawnMultiplier: 1.6 },
