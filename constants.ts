@@ -113,6 +113,23 @@ export const SPRITE_STASH_HOUSE_URL =
 export const SPRITE_OC_TRANSPO_BUS_URL =
   'https://i.ibb.co/0yJHmfHB/bus.png';
 
+export const PLAYER_RUN_SPRITES = [
+  'https://i.ibb.co/wZDRxS10/hood-run-1.png',
+  'https://i.ibb.co/gZ3dDzs8/hood-run-2.png',
+  'https://i.ibb.co/zVCnCwGt/hood-run-3.png',
+  'https://i.ibb.co/CF6MrfW/hood-run-4.png',
+  'https://i.ibb.co/9m0KwB1K/hood-run-5.png',
+  'https://i.ibb.co/N6HLRk7K/hood-run-6.png',
+];
+
+export const PLAYER_IDLE_SPRITES = [
+  'https://i.ibb.co/dw3wgpPK/hood-idle1.png',
+  'https://i.ibb.co/9kHx3sfp/hood-idle2.png',
+  'https://i.ibb.co/m53YwYdz/hood-idle3.png',
+  'https://i.ibb.co/9kHx3sfp/hood-idle2.png',
+  'https://i.ibb.co/dw3wgpPK/hood-idle1.png',
+];
+
 // --- ZONES (Areas of Ottawa) ---
 export const ZONES: Zone[] = [
   { name: 'ByWard Market', rect: [2400, 1900, 500, 500], spawnMultiplier: 1.6 },
@@ -199,8 +216,7 @@ export const BRIDGES: Bridge[] = [
     nameKey: 'bridge_alexandra',
     from: { x: 2300, y: 1500 },
     to: { x: 2300, y: 900 },
-    rect: [2265, 1100, 70, 150],
-    repairGag: true
+    rect: [2265, 1100, 70, 150]
   },
   {
     name: 'Portage Bridge',
@@ -731,10 +747,47 @@ export const UPGRADES: Record<UpgradeId, Upgrade> = {
 };
 
 // --- Quests ---
+export const QUEST_ANYWHERE = 'Anywhere';
+
 export const QUESTS: Quest[] = [
-  { id: 1, descriptionKey: 'quest_1_desc', targetZone: null, targetCount: 20, reward: 10, progress: 0 },
-  { id: 2, descriptionKey: 'quest_2_desc', targetZone: 'ByWard Market', targetCount: 30, reward: 25, progress: 0 },
-  { id: 3, descriptionKey: 'quest_3_desc', targetZone: null, targetCount: 50, reward: 50, progress: 0 },
-  { id: 4, descriptionKey: 'quest_4_desc', targetZone: null, targetCount: 100, reward: 75, progress: 0 },
-  { id: 5, descriptionKey: 'quest_5_desc', targetZone: 'The Glebe', targetCount: 40, reward: 60, progress: 0 }
+  {
+    id: 1,
+    descriptionKey: 'quest_1_desc',
+    targetZone: QUEST_ANYWHERE,
+    targetCount: 20,
+    reward: 10,
+    progress: 0
+  },
+  {
+    id: 2,
+    descriptionKey: 'quest_2_desc',
+    targetZone: 'ByWard Market',
+    targetCount: 30,
+    reward: 25,
+    progress: 0
+  },
+  {
+    id: 3,
+    descriptionKey: 'quest_3_desc',
+    targetZone: QUEST_ANYWHERE,
+    targetCount: 50,
+    reward: 50,
+    progress: 0
+  },
+  {
+    id: 4,
+    descriptionKey: 'quest_4_desc',
+    targetZone: QUEST_ANYWHERE,
+    targetCount: 100,
+    reward: 75,
+    progress: 0
+  },
+  {
+    id: 5,
+    descriptionKey: 'quest_5_desc',
+    targetZone: 'The Glebe',
+    targetCount: 40,
+    reward: 60,
+    progress: 0
+  }
 ];

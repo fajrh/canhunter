@@ -40,7 +40,7 @@ const Hud: React.FC<HudProps> = ({ money, inventoryCount, inventoryCap, stashCou
         </div>
         <div className="text-right">
           <span>{formatGameTime(gameTime)}</span>
-          <p className="text-yellow-400 text-[8px] font-['Arial'] leading-none tracking-wider">v1.0.6</p>
+          <p className="text-yellow-400 text-[8px] font-['Arial'] leading-none tracking-wider">v1.0.8</p>
         </div>
       </div>
       <div className="mt-2">

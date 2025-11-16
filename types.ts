@@ -39,7 +39,7 @@ export interface Upgrade {
 export interface Quest {
   id: number;
   descriptionKey: string;
-  targetZone: string | null;
+  targetZone: string;
   targetCount: number;
   reward: number;
   progress: number;
@@ -51,6 +51,7 @@ export interface PlayerState {
   pathQueue: Vector2[];
   speed: number;
   velocity: Vector2;
+  facing: 'left' | 'right';
   inventory: Collectible[];
   inventoryCap: number;
   money: number;
@@ -215,6 +216,8 @@ export interface GameState {
   isWinter: boolean;
   dialogue: ChatBubble[];
   closestBridge: Bridge | null;
+  isDepositing: boolean;
+  sellCooldown: number;
 }
 
 // Separate state for UI to avoid re-rendering the whole app on every frame

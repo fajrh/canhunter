@@ -15,6 +15,7 @@ import type {
   NPCType,
   UIState,
   Zone,
+  Quest,
 } from '../types.ts';
 import {
   REFUND_DEPOT_POSITION,
@@ -29,6 +30,7 @@ import {
   ZONES,
   UPGRADES,
   QUESTS,
+  QUEST_ANYWHERE,
   HOUSES,
   WATER_BODIES,
   BRIDGES,
@@ -133,8 +135,6 @@ const resolvePath = (start: Vector2, destination: Vector2, bridges: Bridge[]): V
   let bestCost = Infinity;
 
   bridges.forEach((bridge) => {
-    if (bridge.repairGag) return;
-
     const [bx, by, bw, bh] = bridge.rect;
     const centerX = bx + bw / 2;
     const centerY = by + bh / 2;
@@ -363,6 +363,7 @@ const getInitialPlayerState = (): PlayerState => ({
   pathQueue: [],
   speed: PLAYER_BASE_SPEED,
   velocity: { x: 0, y: 0 },
+  facing: 'right',
   inventory: [],
   inventoryCap: BASE_INVENTORY_CAP,
   money: 0,
@@ -378,6 +379,22 @@ const getInitialPlayerState = (): PlayerState => ({
   isInvulnerable: false,
   invulnerableTimer: 0,
 });
+
+const normalizeQuest = (quest?: Quest | null): Quest | null => {
+  if (!quest) return null;
+  return {
+    ...quest,
+    targetZone: quest.targetZone || QUEST_ANYWHERE,
+    progress: quest.progress ?? 0,
+  };
+};
+
+const getNextQuest = (currentQuestId: number): Quest | null => {
+  const currentIndex = QUESTS.findIndex((q) => q.id === currentQuestId);
+  if (currentIndex === -1) return null;
+  const nextQuest = QUESTS[currentIndex + 1];
+  return nextQuest ? { ...nextQuest, progress: 0 } : null;
+};
 
 // temp canvas for measuring chat bubble text
 const tempCtx = document.createElement('canvas').getContext('2d')!;
@@ -428,12 +445,18 @@ export const useGameEngine = () => {
   if (gameState.current === null) {
     const saved = saveService.loadGame();
     const basePlayer = getInitialPlayerState();
+    const startingQuest = normalizeQuest(saved?.activeQuest) || {
+      ...QUESTS[0],
+      progress: 0,
+      targetZone: QUEST_ANYWHERE,
+    };
     const playerState: PlayerState = saved
       ? {
           ...basePlayer,
           ...saved.player,
           upgrades: new Set(Array.from(saved.player.upgrades)),
           hasCollectedFirstCan: saved.player.hasCollectedFirstCan || false,
+          facing: saved.player.facing || 'right',
         }
       : basePlayer;
 
@@ -462,7 +485,7 @@ export const useGameEngine = () => {
       foliage: FOLIAGE,
       camera: { ...playerState.position },
       gameTime: saved?.gameTime || 0,
-      activeQuest: saved?.activeQuest || { ...QUESTS[0], progress: 0 },
+      activeQuest: startingQuest,
       lastSellTime: saved?.lastSellTime || 0,
       flyingCans: [],
       flyingCanIdCounter: 0,
@@ -477,6 +500,8 @@ export const useGameEngine = () => {
       isWinter: true,
       dialogue: [],
       closestBridge: null,
+      isDepositing: false,
+      sellCooldown: 0,
     };
 
     // Top up initial collectibles if save is empty / light
@@ -517,6 +542,42 @@ export const useGameEngine = () => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), duration);
   };
+
+  const applyQuestProgress = useCallback(
+    (state: GameState, collected: { collectible: Collectible; zone?: Zone }[]) => {
+      let currentQuest = state.activeQuest;
+      if (!currentQuest) return;
+
+    let remainingEligible = collected.filter(
+      (c) =>
+        currentQuest &&
+        (currentQuest.targetZone === QUEST_ANYWHERE ||
+          c.zone?.name === currentQuest.targetZone),
+    ).length;
+
+    while (currentQuest && remainingEligible > 0) {
+      const needed = currentQuest.targetCount - currentQuest.progress;
+      const applied = Math.min(remainingEligible, needed);
+      currentQuest.progress += applied;
+      remainingEligible -= applied;
+
+      if (currentQuest.progress >= currentQuest.targetCount) {
+        state.player.money += currentQuest.reward;
+        state.floatingTexts.push({
+          id: effectIdCounter.current++,
+          text: `+$${currentQuest.reward.toFixed(2)}`,
+          position: { ...state.player.position, y: state.player.position.y - 32 },
+          life: 1.2,
+          color: '#FFD700',
+        });
+        setToast('toast_quest_complete', 3500);
+        const nextQuest = getNextQuest(currentQuest.id);
+        state.activeQuest = nextQuest;
+        currentQuest = state.activeQuest;
+      }
+    }
+  },
+  [setToast]);
   const clearToast = () => setToastMessage(null);
 
   const gameLoop = useCallback(
@@ -593,6 +654,12 @@ export const useGameEngine = () => {
         if (Math.abs(velocity.y) < 0.02) velocity.y = 0;
         player.position.x += velocity.x * deltaTime;
         player.position.y += velocity.y * deltaTime;
+      }
+
+      if (velocity.x > 1.5) {
+        player.facing = 'right';
+      } else if (velocity.x < -1.5) {
+        player.facing = 'left';
       }
 
       if (isPointInWater(player.position) && !isPointOnBridge(player.position, state.bridges)) {
@@ -756,7 +823,6 @@ export const useGameEngine = () => {
         let closestBridge: Bridge | null = null;
         let minD = Infinity;
         BRIDGES.forEach((b) => {
-          if (b.repairGag) return;
           const midPoint = {
             x: b.rect[0] + b.rect[2] / 2,
             y: b.rect[1] + b.rect[3] / 2,
@@ -866,14 +932,7 @@ export const useGameEngine = () => {
             audioService.playBoostSound();
           }
 
-          if (state.activeQuest) {
-            const questItems = collectedForInventory.filter(
-              (c) =>
-                !state.activeQuest!.targetZone ||
-                c.zone?.name === state.activeQuest!.targetZone,
-            );
-            state.activeQuest.progress += questItems.length;
-          }
+          applyQuestProgress(state, collectedForInventory);
         }
       }
 
@@ -902,14 +961,53 @@ export const useGameEngine = () => {
         state.isPlayerNearDepot &&
         (player.inventory.length > 0 || player.stash.length > 0)
       ) {
-        const totalItems = player.inventory.length + player.stash.length;
-        const earnings =
-          totalItems * COLLECTIBLE_VALUE * (player.upgrades.has('vest') ? 1.1 : 1);
-        player.money += earnings;
-        player.inventory = [];
-        player.stash = [];
-        audioService.playSellSound();
+        if (!state.isDepositing) {
+          state.isDepositing = true;
+          audioService.playSellSound();
+        }
+
+        state.sellCooldown -= deltaTime;
+        while (
+          state.sellCooldown <= 0 &&
+          (player.inventory.length > 0 || player.stash.length > 0)
+        ) {
+          const source = player.inventory.length > 0 ? player.inventory : player.stash;
+          const sold = source.shift();
+          if (!sold) break;
+
+          const id = state.flyingCanIdCounter++;
+          state.flyingCans.push({
+            id,
+            start: { ...player.position },
+            end: { ...REFUND_DEPOT_POSITION },
+            progress: 0,
+            imageUrl: sold.imageUrl,
+            emoji: sold.emoji,
+          });
+
+          const payout =
+            COLLECTIBLE_VALUE * (player.upgrades.has('vest') ? 1.1 : 1);
+          player.money += payout;
+          state.lastSellTime = state.gameTime;
+          state.sellCooldown += 0.05;
+        }
+
+        if (player.inventory.length === 0 && player.stash.length === 0) {
+          state.isDepositing = false;
+          state.sellCooldown = 0;
+        }
+      } else {
+        state.isDepositing = false;
+        state.sellCooldown = 0;
       }
+
+      // Animate flying cans to depot
+      state.flyingCans = state.flyingCans
+        .map((can) => ({
+          ...can,
+          progress: can.progress + deltaTime * 3,
+        }))
+        .filter((can) => can.progress < 1.05);
 
       // Floating texts & click markers
       state.floatingTexts = state.floatingTexts
@@ -926,7 +1024,7 @@ export const useGameEngine = () => {
 
       animationFrameIdRef.current = requestAnimationFrame(gameLoop);
     },
-    [setToast],
+    [setToast, applyQuestProgress],
   );
 
   // UI update loop
@@ -984,16 +1082,6 @@ export const useGameEngine = () => {
     (position: Vector2, isBridgeClick: boolean = false) => {
       const state = gameState.current;
       if (!state) return;
-
-      if (!isBridgeClick) {
-        const targetBridge = state.bridges.find(
-          (b) => b.repairGag && isPointInRect(position, b.rect),
-        );
-        if (targetBridge) {
-          setToast('toast_detour', 4000);
-          return;
-        }
-      }
 
       const path = resolvePath(state.player.position, position, state.bridges);
       if (!path || path.length === 0) {
