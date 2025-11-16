@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GameCanvas from './components/GameCanvas';
 import Hud from './components/Hud';
 import Controls from './components/Controls';
@@ -12,6 +12,18 @@ import { t } from './services/localization';
 import FlashMessage from './components/FlashMessage';
 import InventoryFullPrompt from './components/InventoryFullPrompt';
 
+const CashOutAnimation = ({ onFinish }: { onFinish: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onFinish, 4000);
+    return () => clearTimeout(timer);
+  }, [onFinish]);
+
+  return (
+    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-50 text-white text-center">
+      <div className="text-6xl animate-bounce">🚲</div>
+    </div>
+  );
+};
 
 export default function App() {
   const [isUpgradesOpen, setIsUpgradesOpen] = useState(false);
@@ -42,17 +54,29 @@ export default function App() {
 
   // The game engine is not ready on the first render
   if (!uiState) {
-    return <div className="w-full h-full bg-gray-800 flex items-center justify-center text-white">Loading...</div>;
+    return (
+      <div className="w-full h-full bg-gray-800 flex items-center justify-center text-white">
+        Loading...
+      </div>
+    );
   }
 
   return (
     <div className="w-full h-full bg-gray-800 text-white font-sans select-none touch-callout-none">
-      {!uiState.hasCollectedFirstCan && <GameMessage text={t('intro_prompt', uiState.language)} />}
-      {uiState.isInventoryFull && uiState.hasCollectedFirstCan && (
-        <InventoryFullPrompt text={t('inventory_full_prompt', uiState.language)} />
+      {!uiState.hasCollectedFirstCan && (
+        <GameMessage text={t('intro_prompt', uiState.language)} />
       )}
-      
-      <FlashMessage messageKey={uiState.flashMessageKey} language={uiState.language} />
+
+      {uiState.isInventoryFull && uiState.hasCollectedFirstCan && (
+        <InventoryFullPrompt
+          text={t('inventory_full_prompt', uiState.language)}
+        />
+      )}
+
+      <FlashMessage
+        messageKey={uiState.flashMessageKey}
+        language={uiState.language}
+      />
 
       <GameCanvas
         gameStateRef={gameState}
@@ -93,9 +117,17 @@ export default function App() {
       )}
 
       {isHelpOpen && (
-          <HelpModal onClose={() => setIsHelpOpen(false)} language={uiState.language} />
+        <HelpModal
+          onClose={() => setIsHelpOpen(false)}
+          language={uiState.language}
+        />
       )}
-      <Toast messageKey={toastMessage} onDismiss={clearToast} language={uiState.language} />
+
+      <Toast
+        messageKey={toastMessage}
+        onDismiss={clearToast}
+        language={uiState.language}
+      />
     </div>
   );
 }

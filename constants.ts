@@ -1,4 +1,3 @@
-// constants.ts
 import type {
   Zone,
   Upgrade,
@@ -67,80 +66,62 @@ export const PLAYER_RADIUS = 30;
 export const COLLECTIBLE_RADIUS = 20;
 export const COLLECTIBLE_LIFESPAN = 10 * 60 * 1000; // 10 minutes
 export const COLLECTIBLE_VALUE = 0.1; // $0.10
-export const SPEED_BOOST_CHAIN_WINDOW = 5000; // ms
-export const SPEED_BOOST_CHAIN_THRESHOLD = 5;
-export const SPEED_BOOST_BATCH_TRIGGER = 3;
-export const SPEED_BOOST_DURATION = 6000;
-export const SPEED_BOOST_MULTIPLIER = 1.35;
+export const SPEED_BOOST_CHAIN_WINDOW = 5000; // ms to maintain chain
+export const SPEED_BOOST_CHAIN_THRESHOLD = 5; // items in chain to trigger boost
+export const SPEED_BOOST_BATCH_TRIGGER = 3; // items grabbed at once to trigger boost
+export const SPEED_BOOST_DURATION = 6000; // ms of boost duration
+export const SPEED_BOOST_MULTIPLIER = 1.35; // movement multiplier during boost
 export const PLAYER_MAX_HP = 100;
 export const TRAFFIC_DAMAGE = 30;
 export const NPC_SHOVE_DAMAGE = 10;
 export const CANAL_COLD_DAMAGE = 1; // per second
-export const BRIDGE_APPROACH_DISTANCE = 280;
-export const BRIDGE_PATH_SAMPLES = 24;
-export const BRIDGE_SNAP_PADDING = 28;
+export const BRIDGE_APPROACH_DISTANCE = 280; // px distance to suggest nearest bridge
+export const BRIDGE_PATH_SAMPLES = 24; // sampling resolution for bridge pathfinding
+export const BRIDGE_SNAP_PADDING = 28; // px padding when checking bridge clicks
 
-// Road texture (tiling)
-export const ROAD_TEXTURE_URL =
-  'https://i.ibb.co/s9V8fFRv/download.jpg'; // must end in .jpg
+// Approximate MUTCD-style guide-sign green (Ontario uses similar freeway green)
+export const ROAD_SIGN_GREEN = '#407060';
+export const ROAD_SIGN_GREEN_BORDER = '#1f3330';
+
+export const ROAD_TEXTURE_URL = 'https://i.ibb.co/s9V8fFRv/download.jpg';
 export const ROAD_TILE_SIZE = 64;
 
 // --- ZONES (Areas of Ottawa) ---
-// Coordinates are approximate but preserve real-world relationships:
-// River at ~y=1100, Parliament around (1900,2000), ByWard NE, Glebe/Lansdowne south, etc.
 export const ZONES: Zone[] = [
-  // East of Parliament, north of Rideau St
-  { name: 'ByWard Market', rect: [2400, 1900, 700, 600], spawnMultiplier: 1.6 },
-  // Between Bronson & Elgin, south of Wellington, north of Queensway-ish
-  { name: 'Centretown', rect: [1400, 2200, 1200, 1200], spawnMultiplier: 1.3 },
-  // South of Queensway, along Bank & the Canal
-  { name: 'The Glebe', rect: [1600, 3400, 1000, 1500], spawnMultiplier: 1.2 },
-  // East of the Canal, uOttawa + Sandy Hill
-  { name: 'Sandy Hill', rect: [2600, 2300, 900, 1300], spawnMultiplier: 1.1 },
-  // West of downtown, around Wellington West / Hintonburg
-  { name: 'Hintonburg', rect: [600, 2500, 1100, 1400], spawnMultiplier: 1.0 },
-  // Further west along Richmond / Westboro
-  { name: 'Westboro', rect: [0, 2400, 600, 1500], spawnMultiplier: 0.8 },
-  // Preston / Little Italy near Dows Lake
-  { name: 'Little Italy', rect: [1350, 3950, 600, 900], spawnMultiplier: 1.1 },
-  // Chinatown around Somerset & Bronson
-  { name: 'Chinatown', rect: [1100, 2950, 600, 800], spawnMultiplier: 1.1 }
+  { name: 'ByWard Market', rect: [2400, 1900, 500, 500], spawnMultiplier: 1.6 },
+  { name: 'Centretown', rect: [1500, 2500, 1000, 1000], spawnMultiplier: 1.3 },
+  { name: 'The Glebe', rect: [1500, 3500, 1000, 1500], spawnMultiplier: 1.2 },
+  { name: 'Sandy Hill', rect: [2500, 2400, 1000, 1000], spawnMultiplier: 1.1 },
+  { name: 'Hintonburg', rect: [500, 2500, 1000, 1500], spawnMultiplier: 1.0 },
+  { name: 'Westboro', rect: [0, 2500, 500, 1500], spawnMultiplier: 0.8 },
+  { name: 'Little Italy', rect: [1000, 3800, 400, 800], spawnMultiplier: 1.1 },
+  { name: 'Chinatown', rect: [1000, 3000, 400, 800], spawnMultiplier: 1.1 }
 ];
 
-// --- Water bodies ---
-// Rideau Canal: rough centre-line from downtown to Dows Lake / south
+// Roughly following real geometry: canal from Dow's Lake to Parliament, etc.
 const RIDEAU_CANAL_POLY: Vector2[] = [
-  // Downtown near Parliament / Rideau Centre
-  { x: 1700, y: 1300 },
-  { x: 1680, y: 1600 },
-  { x: 1640, y: 2100 },
-  { x: 1690, y: 2600 },
-  { x: 1740, y: 3200 },
-  { x: 1780, y: 3800 },
-  { x: 1800, y: 4400 },
-  // Near Lansdowne / TD Place
-  { x: 1820, y: 4800 },
-  { x: 1840, y: 5200 },
-  { x: 1860, y: 6000 },
-  // West bank
-  { x: 2000, y: 6000 },
-  { x: 1980, y: 5200 },
-  { x: 1960, y: 4800 },
-  { x: 1940, y: 4200 },
-  { x: 1920, y: 3600 },
-  { x: 1880, y: 3000 },
-  { x: 1840, y: 2400 },
-  { x: 1820, y: 1900 },
-  { x: 1800, y: 1500 },
-  { x: 1780, y: 1300 }
+  { x: 1400, y: 1200 },
+  { x: 1420, y: 1500 },
+  { x: 1380, y: 2000 },
+  { x: 1430, y: 2500 },
+  { x: 1480, y: 3500 },
+  { x: 1530, y: 4500 },
+  { x: 1550, y: 6000 },
+  { x: 1750, y: 6000 },
+  { x: 1730, y: 4500 },
+  { x: 1680, y: 3500 },
+  { x: 1630, y: 2500 },
+  { x: 1580, y: 2000 },
+  { x: 1620, y: 1500 },
+  { x: 1600, y: 1200 }
 ];
 
-// Ottawa River band across the top of the map
+// Ottawa River strip at the north edge
 const OTTAWA_RIVER_POLY: Vector2[] = [
-  { x: 0, y: 1080 },
-  { x: 4000, y: 1080 },
-  { x: 4000, y: 1280 },
-  { x: 0, y: 1280 }
+  { x: 0, y: 1100 },
+  { x: 4000, y: 1100 },
+  { x: 4000, y: 1250 },
+  { x: 0, y: 1250 }
 ];
 
 export const WATER_BODIES: WaterBody[] = [
@@ -152,14 +133,12 @@ export const isPointInWater = (point: Vector2): boolean =>
   WATER_BODIES.some((wb) => pointInPoly(point, wb.polygon));
 
 // --- Ontario/Quebec separation ---
-export const QUEBEC_BORDER_Y = 1120; // just south of the river band
+export const QUEBEC_BORDER_Y = 1120;
 export const isInQuebec = (p: Vector2) => p.y < QUEBEC_BORDER_Y;
 
 // --- World Objects ---
-// Roughly Centretown / Glebe border
-export const STASH_HOUSE_POSITION: Vector2 = { x: 1800, y: 3600 };
-// Near Canadian Museum of History / Jacques-Cartier Park in Gatineau
-export const REFUND_DEPOT_POSITION: Vector2 = { x: 2500, y: 950 };
+export const STASH_HOUSE_POSITION: Vector2 = { x: 1800, y: 3700 }; // Centretown/Glebe border
+export const REFUND_DEPOT_POSITION: Vector2 = { x: 2350, y: 900 }; // In Gatineau
 export const KIOSK_INTERACTION_RADIUS = 150;
 
 // --- Houses ---
@@ -182,64 +161,59 @@ const createHouseCluster = (
 };
 
 export const HOUSES: House[] = [
-  // Glebe / Centretown clusters
-  ...createHouseCluster({ x: 1800, y: 3600 }, 6, 150),
-  ...createHouseCluster({ x: 2050, y: 3900 }, 6, 150),
-  ...createHouseCluster({ x: 1700, y: 4100 }, 7, 180),
-  // Sandy Hill / uOttawa
-  ...createHouseCluster({ x: 2700, y: 2600 }, 8, 180),
-  ...createHouseCluster({ x: 3100, y: 2900 }, 6, 160),
-  // Hintonburg / Wellington West
-  ...createHouseCluster({ x: 900, y: 2800 }, 7, 180),
-  ...createHouseCluster({ x: 1100, y: 3200 }, 5, 140),
-  // Westboro
-  ...createHouseCluster({ x: 400, y: 2700 }, 7, 200)
+  ...createHouseCluster({ x: 1800, y: 3700 }, 6, 150),
+  ...createHouseCluster({ x: 2100, y: 4000 }, 5, 120),
+  ...createHouseCluster({ x: 1750, y: 4400 }, 7, 160),
+  ...createHouseCluster({ x: 2700, y: 2800 }, 8, 180),
+  ...createHouseCluster({ x: 3100, y: 3100 }, 6, 140),
+  ...createHouseCluster({ x: 800, y: 2900 }, 6, 160),
+  ...createHouseCluster({ x: 1100, y: 3500 }, 5, 130),
+  ...createHouseCluster({ x: 3000, y: 1900 }, 9, 200)
 ];
 
 // --- Bridges ---
 export const BRIDGES: Bridge[] = [
-  // West-to-east ordering along the river
+  // East to west across the river, roughly matching real order
   {
-    name: 'Champlain Bridge',
-    nameKey: 'bridge_champlain',
-    from: { x: 600, y: 1260 },
-    to: { x: 600, y: 1080 },
-    rect: [580, 1080, 40, 180]
+    name: 'Macdonald-Cartier Bridge',
+    nameKey: 'bridge_macdonald_cartier',
+    from: { x: 3000, y: 1260 },
+    to: { x: 3000, y: 1090 },
+    rect: [2980, 1090, 40, 170]
   },
   {
-    name: 'Chaudière Crossing',
-    nameKey: 'bridge_chaudiere',
-    from: { x: 1300, y: 1260 },
-    to: { x: 1300, y: 1080 },
-    rect: [1280, 1080, 40, 180]
+    name: 'Alexandra Bridge',
+    nameKey: 'bridge_alexandra',
+    from: { x: 2300, y: 1260 },
+    to: { x: 2300, y: 1090 },
+    rect: [2280, 1090, 40, 170],
+    repairGag: true
   },
   {
     name: 'Portage Bridge',
     nameKey: 'bridge_portage',
     from: { x: 1800, y: 1260 },
-    to: { x: 1800, y: 1080 },
-    rect: [1780, 1080, 40, 180]
+    to: { x: 1800, y: 1090 },
+    rect: [1780, 1090, 40, 170]
   },
   {
-    name: 'Alexandra Bridge',
-    nameKey: 'bridge_alexandra',
-    from: { x: 2350, y: 1260 },
-    to: { x: 2350, y: 1080 },
-    rect: [2330, 1080, 40, 180],
-    repairGag: true
+    name: 'Chaudière Crossing',
+    nameKey: 'bridge_chaudiere',
+    from: { x: 1200, y: 1260 },
+    to: { x: 1200, y: 1090 },
+    rect: [1180, 1090, 40, 170]
   },
   {
-    name: 'Macdonald-Cartier Bridge',
-    nameKey: 'bridge_macdonald_cartier',
-    from: { x: 2900, y: 1260 },
-    to: { x: 2900, y: 1080 },
-    rect: [2880, 1080, 40, 180]
+    name: 'Champlain Bridge',
+    nameKey: 'bridge_champlain',
+    from: { x: 500, y: 1260 },
+    to: { x: 500, y: 1090 },
+    rect: [480, 1090, 40, 170]
   }
 ];
 
 // --- Landmarks ---
-// Placed relative to real downtown: Parliament just south of river,
-// ByWard east, Hintonburg/Westboro west, Glebe/Lansdowne south, etc.
+// Positions are approximate but keep real relative layout: Parliament / ByWard / uOttawa / Lansdowne / Dow's Lake…
 export const LANDMARKS: Landmark[] = [
   {
     nameKey: 'landmark_parliament',
@@ -291,20 +265,22 @@ export const LANDMARKS: Landmark[] = [
   { nameKey: 'landmark_war_museum', position: { x: 1450, y: 2050 }, emoji: '🪖' },
   { nameKey: 'landmark_supreme_court', position: { x: 1650, y: 2050 }, emoji: '⚖️' },
   { nameKey: 'landmark_chateau_laurier', position: { x: 2150, y: 2100 }, emoji: '🏰' },
-  { nameKey: 'landmark_chinatown', position: { x: 1250, y: 3000 }, emoji: '🏮' },
-  { nameKey: 'landmark_glebe', position: { x: 1850, y: 3700 }, emoji: '🏘️' },
+  { nameKey: 'landmark_chinatown', position: { x: 1200, y: 3000 }, emoji: '🏮' },
+  { nameKey: 'landmark_glebe', position: { x: 1850, y: 3800 }, emoji: '🏘️' },
   { nameKey: 'landmark_tunneys_pasture', position: { x: 800, y: 2500 }, emoji: '🏢' },
-  { nameKey: 'landmark_bayview', position: { x: 1150, y: 2550 }, emoji: '🚉' },
-  { nameKey: 'landmark_pimisi', position: { x: 1350, y: 2350 }, emoji: '🚉' },
+  { nameKey: 'landmark_bayview', position: { x: 1100, y: 2550 }, emoji: '🚉' },
+  { nameKey: 'landmark_pimisi', position: { x: 1300, y: 2350 }, emoji: '🚉' },
   { nameKey: 'landmark_history_museum', position: { x: 2350, y: 950 }, emoji: '🏛️' },
-  { nameKey: 'landmark_jacques_cartier_park', position: { x: 2600, y: 900 }, emoji: '🌲' }
+  {
+    nameKey: 'landmark_jacques_cartier_park',
+    position: { x: 2600, y: 900 },
+    emoji: '🌲'
+  }
 ];
 
 // --- Foliage & Clutter ---
 const isNearLandmark = (p: Vector2, r = 80) =>
-  LANDMARKS.some(
-    (lm) => Math.hypot(p.x - lm.position.x, p.y - lm.position.y) < r
-  );
+  LANDMARKS.some((lm) => Math.hypot(p.x - lm.position.x, p.y - lm.position.y) < r);
 
 const generateClutter = (
   count: number,
@@ -336,7 +312,7 @@ export const FOLIAGE: Foliage[] = [
   ...generateClutter(20, '🪑', 3, 'other'),
   ...generateClutter(18, '💡', 4, 'other'),
   ...generateClutter(28, '🍁', 7, 'other'),
-  // Winterlude-ish pretzel stands
+  // Winterlude-style pretzel stands
   {
     position: { x: 1700, y: 4100 },
     emoji: '🥨',
@@ -352,134 +328,75 @@ export const FOLIAGE: Foliage[] = [
 ];
 
 // --- Traffic ---
-// Paths roughly along Elgin, Wellington, Bronson, Wellington West
-export const TRAFFIC_PATHS: Vector2[][] = [
-  // Elgin St: from Wellington south into Centretown
-  [
-    { x: 1900, y: 1900 },
-    { x: 1900, y: 4800 }
-  ],
-  // Wellington St: west-east in front of Parliament
-  [
-    { x: 800, y: 2050 },
-    { x: 3200, y: 2050 }
-  ],
-  // Bronson Ave: north-south west of downtown
-  [
-    { x: 1300, y: 2400 },
-    { x: 1300, y: 5200 }
-  ],
-  // Wellington West / Holland-ish
-  [
-    { x: 400, y: 2850 },
-    { x: 1400, y: 2850 }
-  ]
+export const TRAFFIC_PATHS = [
+  [{ x: 1850, y: 1200 }, { x: 1850, y: 3100 }], // Elgin St
+  [{ x: 1200, y: 2100 }, { x: 2600, y: 2100 }], // Wellington St
+  [{ x: 1250, y: 3000 }, { x: 1250, y: 4500 }], // Bronson Ave
+  [{ x: 100, y: 2850 }, { x: 1000, y: 2850 }] // Wellington West
 ];
 
-// --- Roads ---
-// These are the segments the renderer tiles with ROAD_TEXTURE_URL.
-// IDs starting with "bridge_" are treated as bridge decks in GameCanvas.
+// --- Roads (screen-space geometry approximating downtown Ottawa) ---
 export const ROADS: RoadSegment[] = [
-  // Core north-south
-  { id: 'elgin', from: { x: 1900, y: 1900 }, to: { x: 1900, y: 5200 }, width: 150 },
-  { id: 'bank', from: { x: 1750, y: 1850 }, to: { x: 1750, y: 5200 }, width: 140 },
-  { id: 'bronson', from: { x: 1300, y: 2400 }, to: { x: 1300, y: 5200 }, width: 150 },
+  // North-south
+  { id: 'elgin', from: { x: 1850, y: 1200 }, to: { x: 1850, y: 5000 }, width: 150 },
+  { id: 'bronson', from: { x: 1250, y: 2600 }, to: { x: 1250, y: 5200 }, width: 150 },
+  { id: 'bank', from: { x: 1750, y: 1800 }, to: { x: 1750, y: 5200 }, width: 140 },
+  { id: 'sussex', from: { x: 2400, y: 1400 }, to: { x: 2400, y: 2600 }, width: 120 },
 
-  // Canal-side (Queen Elizabeth Driveway-ish)
-  {
-    id: 'queen_elizabeth',
-    from: { x: 1650, y: 1500 },
-    to: { x: 1650, y: 5000 },
-    width: 120
-  },
+  // East-west
+  { id: 'wellington', from: { x: 800, y: 2100 }, to: { x: 3200, y: 2100 }, width: 160 },
+  { id: 'rideau', from: { x: 2100, y: 2300 }, to: { x: 2800, y: 2300 }, width: 140 },
 
-  // East-side Sussex / King Edward-ish
-  { id: 'sussex', from: { x: 2400, y: 1500 }, to: { x: 2400, y: 2600 }, width: 120 },
-
-  // East-west downtown
+  // Bridges (kept separate so they can render differently if needed)
   {
-    id: 'wellington',
-    from: { x: 800, y: 2050 },
-    to: { x: 3200, y: 2050 },
-    width: 160
-  },
-  {
-    id: 'rideau',
-    from: { x: 2100, y: 2250 },
-    to: { x: 2900, y: 2250 },
-    width: 140
-  },
-
-  // 417 / Queensway approximation
-  {
-    id: 'queensway',
-    from: { x: 200, y: 3000 },
-    to: { x: 3800, y: 3000 },
-    width: 180
-  },
-
-  // Wellington West
-  {
-    id: 'wellington_west',
-    from: { x: 400, y: 2850 },
-    to: { x: 1600, y: 2850 },
-    width: 140
-  },
-
-  // Bridge road decks (used as roads but also visually align to BRIDGES)
-  {
-    id: 'bridge_champlain',
-    from: { x: 600, y: 1600 },
-    to: { x: 600, y: 900 },
-    width: 140
-  },
-  {
-    id: 'bridge_chaudiere',
-    from: { x: 1300, y: 1550 },
-    to: { x: 1300, y: 900 },
+    id: 'bridge_macdonald_cartier',
+    from: { x: 3000, y: 1500 },
+    to: { x: 3000, y: 900 },
     width: 130
   },
   {
     id: 'bridge_portage',
-    from: { x: 1800, y: 1550 },
+    from: { x: 1800, y: 1500 },
     to: { x: 1800, y: 900 },
     width: 130
   },
   {
-    id: 'bridge_alexandra',
-    from: { x: 2350, y: 1550 },
-    to: { x: 2350, y: 900 },
+    id: 'bridge_chaudiere',
+    from: { x: 1200, y: 1500 },
+    to: { x: 1200, y: 900 },
     width: 130
   },
   {
-    id: 'bridge_macdonald_cartier',
-    from: { x: 2900, y: 1550 },
-    to: { x: 2900, y: 900 },
-    width: 130
+    id: 'bridge_champlain',
+    from: { x: 500, y: 1600 },
+    to: { x: 500, y: 900 },
+    width: 140
   }
 ];
 
+// Road-label text per ID (kept separate from RoadSegment type)
+export const ROAD_LABELS: Record<string, string> = {
+  elgin: 'ELGIN ST',
+  wellington: 'WELLINGTON ST',
+  bronson: 'BRONSON AVE',
+  bank: 'BANK ST',
+  sussex: 'SUSSEX DR',
+  rideau: 'RIDEAU ST',
+  bridge_macdonald_cartier: 'MACDONALD-CARTIER BRIDGE',
+  bridge_portage: 'PORTAGE BRIDGE',
+  bridge_chaudiere: 'CHAUDIÈRE CROSSING',
+  bridge_champlain: 'CHAMPLAIN BRIDGE'
+};
+
 export const CROSSWALKS: Crosswalk[] = [
-  // Bank / Gladstone-ish
-  {
-    position: { x: 1750, y: 2600 },
-    rect: [1720, 2580, 60, 40],
-    active: false,
-    timer: 0
-  },
-  // Elgin / Wellington-ish
-  {
-    position: { x: 1900, y: 2050 },
-    rect: [1870, 2030, 60, 40],
-    active: false,
-    timer: 0
-  }
+  { position: { x: 1850, y: 2500 }, rect: [1820, 2480, 60, 40], active: false, timer: 0 },
+  { position: { x: 2200, y: 2100 }, rect: [2170, 2080, 60, 40], active: false, timer: 0 }
 ];
 
 // --- NPCs ---
 export const NPC_SPAWNS = [
-  { type: 'security' as const, pos: { x: 2200, y: 2180 } }, // Rideau Centre
-  { type: 'security' as const, pos: { x: 1850, y: 2050 } }, // Near Parliament
+  { type: 'security' as const, pos: { x: 2200, y: 2180 } }, // By Rideau Centre
+  { type: 'security' as const, pos: { x: 1750, y: 2100 } }, // Near Parliament
   { type: 'complainer' as const, pos: { x: 1900, y: 3900 } }, // In The Glebe
   { type: 'general' as const, pos: { x: 2550, y: 2250 } }, // ByWard Market
   { type: 'general' as const, pos: { x: 1700, y: 2800 } }, // Centretown
@@ -488,7 +405,7 @@ export const NPC_SPAWNS = [
 ];
 
 export const BARKS_GENERAL = [
-  "Careful, bud—this sidewalk’s pure slush.",
+  'Careful, bud—this sidewalk’s pure slush.',
   'Ten cents a can? You’ll be rollin’ in loonies, eh.',
   'Mind the LRT… or, uh, the shuttle bus of destiny.',
   'If you see a beavertails stand, grab me a Killaloe Sunrise.',
@@ -505,14 +422,14 @@ export const BARKS_GENERAL = [
   'Sparks Street patios spawn cans like loot drops.',
   'Carleton kids dump a motherlode after exams.',
   'uOttawa rez night? Inventory full in five.',
-  "Don’t slip—black ice is Canada’s final boss.",
+  'Don’t slip—black ice is Canada’s final boss.',
   'NCC says keep the Canal clean, champ.',
-  "That bridge? Detour city—Alexandra’s always ‘under repair’.",
+  'That bridge? Detour city—Alexandra’s always ‘under repair’.',
   'Elgin after 11: poutine in one hand, cans in the other.',
   'Chaudière winds will yeet your toque, careful.',
   'Mooney’s Bay is chill til the dragon boats show.',
   'Glebe garage sales = premium aluminum.',
-  "Tunney’s Pasture… more like Tunney’s Tupperware at lunch.",
+  'Tunney’s Pasture… more like Tunney’s Tupperware at lunch.',
   'Lebreton construction: cans in, exits out.',
   'Chinatown late night—pho, pop cans, prosperity.',
   'Little Italy? Bring extra bags, nonna parties hard.',
@@ -534,8 +451,8 @@ export const BARKS_GENERAL = [
   'Hogs Back roar means you’re close to splash zone.',
   'Arboretum shade: cool cans, cooler squirrels.',
   'St. Laurent big box = cart city, can city.',
-  "Weather app says ‘flurries’; Ottawa says blizzard.",
-  "If it sparkles, it’s probably recyclable—probably.",
+  'Weather app says ‘flurries’; Ottawa says blizzard.',
+  'If it sparkles, it’s probably recyclable—probably.',
   'Got a cart upgrade? Your back will thank you.',
   'Hydro bill high? Pick more cans, become legend.'
 ];
@@ -543,14 +460,14 @@ export const BARKS_GENERAL = [
 export const BARKS_POLICE = [
   'Hey friend—sidewalk stays clear, collect from the curb, ok?',
   'Mind the tracks; LRT fines aren’t worth a nickel.',
-  "Helmet on if you’re biking that load—bylaw’s a thing.",
+  'Helmet on if you’re biking that load—bylaw’s a thing.',
   'No trespassing behind the Beer Store—use the public bins.',
   'All good—just don’t block the crosswalk, champ.',
   'Storm’s coming—plows need space. Keep to the right.',
-  "That’s private property; stick to the city cans, please.",
+  'That’s private property; stick to the city cans, please.',
   'Quick heads-up: bridge detour ahead, use the marked lane.',
-  "Littering ticket’s no fun; bag it and you’re golden.",
-  "Can count’s impressive—watch your back on Bank Street.",
+  'Littering ticket’s no fun; bag it and you’re golden.',
+  'Can count’s impressive—watch your back on Bank Street.',
   'Stay out of the Canal—rescues are pricey.',
   'You’re good to go—thanks for keeping the city tidy.'
 ];
@@ -591,15 +508,9 @@ export const CRITTER_ATLAS = {
     cat_idle: ['cat_idle_0', 'cat_idle_1'],
     cat_walk: ['cat_walk_0', 'cat_walk_1', 'cat_walk_2', 'cat_walk_3'],
     pigeon_idle: ['pigeon_idle_0', 'pigeon_idle_1'],
-    pigeon_walk: [
-      'pigeon_walk_0',
-      'pigeon_walk_1',
-      'pigeon_walk_2',
-      'pigeon_walk_3'
-    ]
+    pigeon_walk: ['pigeon_walk_0', 'pigeon_walk_1', 'pigeon_walk_2', 'pigeon_walk_3']
   }
 };
-
 export const CRITTER_WALK_DUR = [2.5, 4.0];
 export const CRITTER_IDLE_DUR = [1.5, 3.0];
 export const CRITTER_FPS_IDLE = 2;
@@ -608,8 +519,8 @@ export const CRITTER_TURN_MAX = Math.PI / 6;
 export const CRITTER_UPDATE_RATE = 5;
 export const CRITTER_AVOID_WATER = true;
 export const CRITTER_SPAWNS = [
-  { kind: 'pigeon' as const, pos: { x: 1910, y: 2050 } }, // Parliament lawn
-  { kind: 'pigeon' as const, pos: { x: 2600, y: 2200 } } // ByWard
+  { kind: 'pigeon' as const, pos: { x: 1810, y: 2050 } },
+  { kind: 'pigeon' as const, pos: { x: 2600, y: 2200 } }
 ];
 
 // --- Upgrades ---
@@ -644,10 +555,7 @@ export const UPGRADES: Record<UpgradeId, Upgrade> = {
     descriptionKey: 'upgrade_bicycle_desc',
     cost: 150,
     emoji: '🚲',
-    apply: (s: PlayerState) => ({
-      speed: s.speed * 1.35,
-      inventoryCap: s.inventoryCap + 10
-    })
+    apply: (s: PlayerState) => ({ speed: s.speed * 1.35, inventoryCap: s.inventoryCap + 10 })
   },
   bikeTrailer: {
     id: 'bikeTrailer',
@@ -656,10 +564,7 @@ export const UPGRADES: Record<UpgradeId, Upgrade> = {
     cost: 200,
     emoji: '🚲',
     requires: 'bicycle',
-    apply: (s: PlayerState) => ({
-      inventoryCap: s.inventoryCap + 60,
-      speed: s.speed * 0.95
-    })
+    apply: (s: PlayerState) => ({ inventoryCap: s.inventoryCap + 60, speed: s.speed * 0.95 })
   },
   parka: {
     id: 'parka',
@@ -697,44 +602,9 @@ export const UPGRADES: Record<UpgradeId, Upgrade> = {
 
 // --- Quests ---
 export const QUESTS: Quest[] = [
-  {
-    id: 1,
-    descriptionKey: 'quest_1_desc',
-    targetZone: null,
-    targetCount: 20,
-    reward: 10,
-    progress: 0
-  },
-  {
-    id: 2,
-    descriptionKey: 'quest_2_desc',
-    targetZone: 'ByWard Market',
-    targetCount: 30,
-    reward: 25,
-    progress: 0
-  },
-  {
-    id: 3,
-    descriptionKey: 'quest_3_desc',
-    targetZone: null,
-    targetCount: 50,
-    reward: 50,
-    progress: 0
-  },
-  {
-    id: 4,
-    descriptionKey: 'quest_4_desc',
-    targetZone: null,
-    targetCount: 100,
-    reward: 75,
-    progress: 0
-  },
-  {
-    id: 5,
-    descriptionKey: 'quest_5_desc',
-    targetZone: 'The Glebe',
-    targetCount: 40,
-    reward: 60,
-    progress: 0
-  }
+  { id: 1, descriptionKey: 'quest_1_desc', targetZone: null, targetCount: 20, reward: 10, progress: 0 },
+  { id: 2, descriptionKey: 'quest_2_desc', targetZone: 'ByWard Market', targetCount: 30, reward: 25, progress: 0 },
+  { id: 3, descriptionKey: 'quest_3_desc', targetZone: null, targetCount: 50, reward: 50, progress: 0 },
+  { id: 4, descriptionKey: 'quest_4_desc', targetZone: null, targetCount: 100, reward: 75, progress: 0 },
+  { id: 5, descriptionKey: 'quest_5_desc', targetZone: 'The Glebe', targetCount: 40, reward: 60, progress: 0 }
 ];
