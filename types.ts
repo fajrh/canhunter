@@ -51,6 +51,7 @@ export interface PlayerState {
   pathQueue: Vector2[];
   speed: number;
   velocity: Vector2;
+  facing: 'left' | 'right';
   inventory: Collectible[];
   inventoryCap: number;
   money: number;
