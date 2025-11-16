@@ -145,7 +145,7 @@ export const QUEBEC_BORDER_Y = 1120;
 export const isInQuebec = (p: Vector2) => p.y < QUEBEC_BORDER_Y;
 
 // --- World Objects ---
-export const STASH_HOUSE_POSITION: Vector2 = { x: 1800, y: 3700 }; // Centretown/Glebe border
+export const STASH_HOUSE_POSITION: Vector2 = { x: 1450, y: 3100 }; // Gladstone & Bronson
 export const REFUND_DEPOT_POSITION: Vector2 = { x: 2350, y: 900 }; // In Gatineau
 export const KIOSK_INTERACTION_RADIUS = 150;
 
@@ -164,7 +164,7 @@ const createHouseCluster = (
       y: center.y + Math.sin(angle) * distance
     };
     if (!isPointInWater(housePos)) houses.push({ position: housePos });
-  }
+    }
   return houses;
 };
 
@@ -313,14 +313,14 @@ export const LANDMARKS: Landmark[] = [
 
   // Blue bin cluster near your stash / Centretown houses
   {
-    position: { x: 1800, y: 3650 },
+    position: { x: 1500, y: 3150 },
     emoji: '♻️',
     imageUrl: SPRITE_RECYCLE_BIN_URL
   },
 
-  // Stash house sprite in Centretown/Glebe border
+  // Stash house sprite at Gladstone & Bronson
   {
-    position: { x: 1800, y: 3700 }, // matches STASH_HOUSE_POSITION
+    position: { x: 1450, y: 3100 }, // matches STASH_HOUSE_POSITION
     emoji: '🏚️',
     imageUrl: SPRITE_STASH_HOUSE_URL
   }
@@ -376,58 +376,126 @@ export const FOLIAGE: Foliage[] = [
 ];
 
 // --- Traffic ---
+// Snapped to the new road grid (Elgin, Wellington, Bronson, Somerset West)
 export const TRAFFIC_PATHS = [
-  [{ x: 1850, y: 1200 }, { x: 1850, y: 3100 }], // Elgin St
-  [{ x: 1200, y: 2100 }, { x: 2600, y: 2100 }], // Wellington St
-  [{ x: 1250, y: 3000 }, { x: 1250, y: 4500 }], // Bronson Ave
-  [{ x: 100, y: 2850 }, { x: 1000, y: 2850 }] // Wellington West
+  // Elgin St: north–south along x = 1950
+  [{ x: 1950, y: 0 }, { x: 1950, y: 3200 }],
+
+  // Wellington St: east–west along y = 2100
+  [{ x: 0, y: 2100 }, { x: GAME_WORLD_SIZE.width, y: 2100 }],
+
+  // Bronson Ave: north–south along x = 1450
+  [{ x: 1450, y: 0 }, { x: 1450, y: GAME_WORLD_SIZE.height }],
+
+  // Somerset St W: east–west in Hintonburg/Chinatown along y = 2800
+  [{ x: 0, y: 2800 }, { x: 1400, y: 2800 }]
 ];
 
 // --- Roads (grid-ish layout approximating downtown Ottawa) ---
 // X order west→east: Preston, Bronson, Bank, Elgin, Sussex
 // Y order north→south: Wellington, Rideau, Somerset, Gladstone, Queensway, Fifth, Carling
 export const ROADS: RoadSegment[] = [
-  // North–south arterials
-  { id: 'preston', from: { x: 1300, y: 2600 }, to: { x: 1300, y: 5200 }, width: 130 }, // Little Italy axis (west of Bronson)
-  { id: 'bronson', from: { x: 1450, y: 1400 }, to: { x: 1450, y: 5200 }, width: 150 }, // Bronson Ave
-  { id: 'bank', from: { x: 1750, y: 1600 }, to: { x: 1750, y: 5200 }, width: 140 }, // Bank St
-  { id: 'elgin', from: { x: 1950, y: 1600 }, to: { x: 1950, y: 5200 }, width: 130 }, // Elgin St
-  { id: 'sussex', from: { x: 2450, y: 1350 }, to: { x: 2450, y: 2600 }, width: 120 }, // Sussex Dr into ByWard
+  // North–south arterials (edge-to-edge)
+  {
+    id: 'preston',
+    from: { x: 1300, y: 0 },
+    to: { x: 1300, y: GAME_WORLD_SIZE.height },
+    width: 65 // was 130
+  },
+  {
+    id: 'bronson',
+    from: { x: 1450, y: 0 },
+    to: { x: 1450, y: GAME_WORLD_SIZE.height },
+    width: 75 // was 150
+  },
+  {
+    id: 'bank',
+    from: { x: 1750, y: 0 },
+    to: { x: 1750, y: GAME_WORLD_SIZE.height },
+    width: 70 // was 140
+  },
+  {
+    id: 'elgin',
+    from: { x: 1950, y: 0 },
+    to: { x: 1950, y: GAME_WORLD_SIZE.height },
+    width: 65 // was 130
+  },
+  {
+    id: 'sussex',
+    from: { x: 2450, y: 0 },
+    to: { x: 2450, y: GAME_WORLD_SIZE.height },
+    width: 60 // was 120
+  },
 
-  // East–west streets
-  { id: 'wellington', from: { x: 800, y: 2100 }, to: { x: 3200, y: 2100 }, width: 160 }, // Parliament frontage
-  { id: 'rideau', from: { x: 2100, y: 2300 }, to: { x: 2800, y: 2300 }, width: 140 }, // Rideau St / ByWard / uOttawa
-  { id: 'somerset', from: { x: 800, y: 2800 }, to: { x: 2800, y: 2800 }, width: 140 }, // Chinatown ↔ Centretown (Somerset St W)
-  { id: 'gladstone', from: { x: 800, y: 3100 }, to: { x: 2800, y: 3100 }, width: 140 }, // Gladstone Ave (Hintonburg/Little Italy/Centretown)
-  { id: 'queensway', from: { x: 600, y: 3350 }, to: { x: 3200, y: 3350 }, width: 180 }, // Hwy 417 / Queensway (east–west freeway)
-  { id: 'fifth', from: { x: 1400, y: 3800 }, to: { x: 2400, y: 3800 }, width: 140 }, // Fifth Ave through the Glebe
-  { id: 'carling', from: { x: 1200, y: 4600 }, to: { x: 2600, y: 4600 }, width: 160 }, // Carling Ave / Dow’s Lake belt
+  // East–west streets (edge-to-edge)
+  {
+    id: 'wellington',
+    from: { x: 0, y: 2100 },
+    to: { x: GAME_WORLD_SIZE.width, y: 2100 },
+    width: 80 // was 160
+  },
+  {
+    id: 'rideau',
+    from: { x: 0, y: 2300 },
+    to: { x: GAME_WORLD_SIZE.width, y: 2300 },
+    width: 70 // was 140
+  },
+  {
+    id: 'somerset',
+    from: { x: 0, y: 2800 },
+    to: { x: GAME_WORLD_SIZE.width, y: 2800 },
+    width: 70 // was 140
+  },
+  {
+    id: 'gladstone',
+    from: { x: 0, y: 3100 },
+    to: { x: GAME_WORLD_SIZE.width, y: 3100 },
+    width: 70 // was 140
+  },
+  {
+    id: 'queensway',
+    from: { x: 0, y: 3350 },
+    to: { x: GAME_WORLD_SIZE.width, y: 3350 },
+    width: 90 // was 180
+  },
+  {
+    id: 'fifth',
+    from: { x: 0, y: 3800 },
+    to: { x: GAME_WORLD_SIZE.width, y: 3800 },
+    width: 70 // was 140
+  },
+  {
+    id: 'carling',
+    from: { x: 0, y: 4600 },
+    to: { x: GAME_WORLD_SIZE.width, y: 4600 },
+    width: 80 // was 160
+  },
 
-  // Bridges across the Ottawa River
+  // Bridges across the Ottawa River (kept as “exceptional” segments)
   {
     id: 'bridge_macdonald_cartier',
     from: { x: 3000, y: 1500 },
     to: { x: 3000, y: 900 },
-    width: 130,
+    width: 65 // was 130
   },
   {
     id: 'bridge_portage',
     from: { x: 1800, y: 1500 },
     to: { x: 1800, y: 900 },
-    width: 130,
+    width: 65 // was 130
   },
   {
     id: 'bridge_chaudiere',
     from: { x: 1200, y: 1500 },
     to: { x: 1200, y: 900 },
-    width: 130,
+    width: 65 // was 130
   },
   {
     id: 'bridge_champlain',
     from: { x: 500, y: 1600 },
     to: { x: 500, y: 900 },
-    width: 140,
-  },
+    width: 70 // was 140
+  }
 ];
 
 // Road-label text per ID (kept separate from RoadSegment type)
@@ -447,7 +515,7 @@ export const ROAD_LABELS: Record<string, string> = {
   bridge_macdonald_cartier: 'MACDONALD-CARTIER BRIDGE',
   bridge_portage: 'PORTAGE BRIDGE',
   bridge_chaudiere: 'CHAUDIÈRE CROSSING',
-  bridge_champlain: 'CHAMPLAIN BRIDGE',
+  bridge_champlain: 'CHAMPLAIN BRIDGE'
 };
 
 export const CROSSWALKS: Crosswalk[] = [
