@@ -5,8 +5,6 @@ import {
   CAN_IMAGE_URLS,
   GAME_WORLD_SIZE,
   CRITTER_ATLAS,
-  CRITTER_FPS_IDLE,
-  CRITTER_FPS_WALK,
   QUEBEC_BORDER_Y,
   SPEED_BOOST_DURATION,
   ROADS,
@@ -418,7 +416,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         foliage,
         floatingTexts,
         clickMarkers,
-        critters,
         language,
         traffic,
         npcs,
@@ -519,7 +516,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const textMetrics = ctx.measureText(labelText);
         const textWidth = textMetrics.width;
         const paddingX = 6;
-        const paddingY = 3;
         const signWidth = textWidth + paddingX * 2;
         const signHeight = 18;
         const signX = midScreen.x - signWidth / 2;

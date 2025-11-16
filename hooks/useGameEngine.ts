@@ -5,7 +5,6 @@ import type {
   Collectible,
   Vector2,
   UpgradeId,
-  Quest,
   Critter,
   CritterKind,
   Bridge,
@@ -13,7 +12,6 @@ import type {
   Language,
   TrafficVehicle,
   NPC,
-  ChatBubble,
   NPCType,
   UIState,
   Zone,
@@ -98,11 +96,6 @@ const isPointOnBridge = (point: Vector2, bridges: Bridge[]): boolean =>
   );
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
-const len = (v: Vector2) => Math.hypot(v.x, v.y);
-const norm = (v: Vector2) => {
-  const L = len(v) || 1;
-  return { x: v.x / L, y: v.y / L };
-};
 const distance = (a: Vector2, b: Vector2) => Math.hypot(a.x - b.x, a.y - b.y);
 
 const segmentCrossesWater = (start: Vector2, end: Vector2, bridges: Bridge[]): boolean => {
@@ -190,7 +183,11 @@ const resolvePath = (start: Vector2, destination: Vector2, bridges: Bridge[]): V
     }
   });
 
-  return bestPath ? bestPath.map((node) => ({ ...node })) : null;
+  const finalizedPath = bestPath as Vector2[] | null;
+  if (!finalizedPath) {
+    return null;
+  }
+  return finalizedPath.map((node) => ({ ...node }));
 };
 
 // --- New: path refinement & weighted spawning helpers (codex branch) ---
