@@ -22,6 +22,8 @@ import {
   SPRITE_CHINATOWN_GATE_URL,
   SPRITE_STASH_HOUSE_URL,
   SPRITE_OC_TRANSPO_BUS_URL,
+  PLAYER_RUN_SPRITES,
+  PLAYER_IDLE_SPRITES,
 } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
@@ -146,6 +148,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     total: 1,
   });
   const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
+  const playerAnimRef = useRef<{ mode: 'idle' | 'run'; frameIndex: number }>(
+    {
+      mode: 'idle',
+      frameIndex: 0,
+    },
+  );
 
   // --- Asset loading (cans, critters, road tile, landmark images, extra sprites) ---
   useEffect(() => {
@@ -161,11 +169,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       SPRITE_OC_TRANSPO_BUS_URL,
     ];
 
+    const playerSpriteUrls = [...PLAYER_RUN_SPRITES, ...PLAYER_IDLE_SPRITES];
+
     const imagesToLoad = Array.from(
       new Set([
         ...CAN_IMAGE_URLS,
         ...landmarkImageUrls,
         ...extraSpriteUrls,
+        ...playerSpriteUrls,
         CRITTER_ATLAS.image,
         ROAD_TEXTURE_URL,
         GROUND_TEXTURE_URL,
@@ -210,6 +221,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       };
     });
   }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const state = gameStateRef.current;
+      if (!state) return;
+
+      const { player } = state;
+      const speed = Math.hypot(player.velocity.x, player.velocity.y);
+      const nextMode: 'idle' | 'run' = speed > 8 ? 'run' : 'idle';
+      const anim = playerAnimRef.current;
+
+      if (anim.mode !== nextMode) {
+        anim.mode = nextMode;
+        anim.frameIndex = 0;
+        return;
+      }
+
+      const frameCount =
+        nextMode === 'run' ? PLAYER_RUN_SPRITES.length : PLAYER_IDLE_SPRITES.length;
+      anim.frameIndex = (anim.frameIndex + 1) % frameCount;
+    }, 120);
+
+    return () => window.clearInterval(interval);
+  }, [gameStateRef]);
 
   if (!waterFxRef.current) waterFxRef.current = new WaterFX(208, true);
 
@@ -851,14 +886,46 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       if (player.isInvulnerable && Math.floor(time / 100) % 2 === 0) {
         // blink off
       } else {
-        ctx.font = '48px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(
-          player.upgrades.has('bicycle') ? '🚴' : '🧍',
-          playerScreenPos.x,
-          playerScreenPos.y,
-        );
+        const isRunning = Math.hypot(player.velocity.x, player.velocity.y) > 8;
+        const hasBicycle = player.upgrades.has('bicycle');
+        const nextMode: 'idle' | 'run' = isRunning ? 'run' : 'idle';
+        const anim = playerAnimRef.current;
+        if (anim.mode !== nextMode) {
+          anim.mode = nextMode;
+          anim.frameIndex = 0;
+        }
+        const spriteSet = nextMode === 'run' ? PLAYER_RUN_SPRITES : PLAYER_IDLE_SPRITES;
+        const spriteUrl = spriteSet[anim.frameIndex % spriteSet.length];
+        const spriteImg = loadedImages[spriteUrl];
+
+        if (spriteImg && !hasBicycle) {
+          const targetWidth = 48;
+          const targetHeight = 48;
+          const direction = player.facing === 'left' ? -1 : 1;
+          const previousSmoothing = ctx.imageSmoothingEnabled;
+          ctx.save();
+          ctx.translate(playerScreenPos.x, playerScreenPos.y);
+          ctx.scale(direction, 1);
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(
+            spriteImg,
+            -targetWidth / 2,
+            -targetHeight,
+            targetWidth,
+            targetHeight,
+          );
+          ctx.restore();
+          ctx.imageSmoothingEnabled = previousSmoothing;
+        } else {
+          ctx.font = '48px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(
+            hasBicycle ? '🚴' : '🧍',
+            playerScreenPos.x,
+            playerScreenPos.y,
+          );
+        }
         const hpBarWidth = 40;
         const hpBarHeight = 5;
         const hpBarX = playerScreenPos.x - hpBarWidth / 2;
