@@ -15,6 +15,9 @@ import {
   ROAD_LABELS,
   ROAD_SIGN_GREEN,
   ROAD_SIGN_GREEN_BORDER,
+  GROUND_TEXTURE_URL,
+  WATER_TILE_URL,
+  DETAIL_TEXTURE_URLS,
 } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
@@ -152,6 +155,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ...landmarkImageUrls,
         CRITTER_ATLAS.image,
         ROAD_TEXTURE_URL,
+        GROUND_TEXTURE_URL,
+        WATER_TILE_URL,
+        ...DETAIL_TEXTURE_URLS,
       ]),
     );
     let loadedCount = 0;
@@ -264,7 +270,54 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     if (!ctx) return;
 
     const ensureGroundPattern = () => {
-      if (!patternCanvasRef.current) {
+      // Prefer real grass tile if available
+      const grassImg = loadedImages[GROUND_TEXTURE_URL];
+
+      if (grassImg) {
+        const existingCanvas = patternCanvasRef.current;
+        const needsNewCanvas =
+          !existingCanvas ||
+          !(existingCanvas as HTMLCanvasElement).dataset ||
+          (existingCanvas as HTMLCanvasElement).dataset['source'] !== 'grass';
+
+        if (needsNewCanvas) {
+          const patternCanvas = document.createElement('canvas');
+          // Use a fairly big tile so the pattern feels natural but still loops
+          patternCanvas.width = patternCanvas.height = 512;
+          const pctx = patternCanvas.getContext('2d');
+          if (pctx) {
+            pctx.imageSmoothingEnabled = false;
+
+            // Draw the grass texture to cover the tile
+            pctx.drawImage(
+              grassImg,
+              0,
+              0,
+              patternCanvas.width,
+              patternCanvas.height,
+            );
+
+            // Very subtle dark vignette toward corners to keep focus in the middle
+            const vignette = pctx.createRadialGradient(
+              256,
+              256,
+              0,
+              256,
+              256,
+              360,
+            );
+            vignette.addColorStop(0, 'rgba(0,0,0,0)');
+            vignette.addColorStop(1, 'rgba(0,0,0,0.14)');
+            pctx.fillStyle = vignette;
+            pctx.fillRect(0, 0, patternCanvas.width, patternCanvas.height);
+          }
+
+          (patternCanvas as HTMLCanvasElement).dataset['source'] = 'grass';
+          patternCanvasRef.current = patternCanvas;
+          groundPatternRef.current = null;
+        }
+      } else if (!patternCanvasRef.current) {
+        // Fallback: your original painted gradient, used only if tile not loaded yet
         const patternCanvas = document.createElement('canvas');
         patternCanvas.width = patternCanvas.height = 256;
         const pctx = patternCanvas.getContext('2d');
@@ -296,7 +349,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           }
         }
         patternCanvasRef.current = patternCanvas;
+        groundPatternRef.current = null;
       }
+
       if (patternCanvasRef.current && !groundPatternRef.current) {
         groundPatternRef.current = ctx.createPattern(
           patternCanvasRef.current,

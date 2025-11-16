@@ -15,8 +15,8 @@ import type {
 } from './types.ts';
 
 export const GAME_WORLD_SIZE = { width: 4000, height: 6000 };
-export const MAX_COLLECTIBLES = 1500;
-export const INITIAL_COLLECTIBLE_TARGET = 140;
+export const MAX_COLLECTIBLES = 300;
+export const INITIAL_COLLECTIBLE_TARGET = 28;
 
 // --- Helpers (seeded RNG + geometry) ---
 const mulberry32 = (seed: number) => {
@@ -86,6 +86,20 @@ export const ROAD_SIGN_GREEN_BORDER = '#1f3330';
 export const ROAD_TEXTURE_URL = 'https://i.ibb.co/s9V8fFRv/download.jpg';
 export const ROAD_TILE_SIZE = 64;
 
+// --- World textures (OpenGameArt tiles) ---
+export const GROUND_TEXTURE_URL =
+  'https://opengameart.org/sites/default/files/grass03_0.png'; // Seamless Grass Texture II
+
+export const WATER_TILE_URL =
+  'https://opengameart.org/sites/default/files/y2k_water_texture.png'; // Y2K water
+
+// Optional decorative overlays (for later / future polish)
+export const DETAIL_TEXTURE_URLS = [
+  'https://opengameart.org/sites/default/files/flowers_5.png', // flowers patch
+  'https://opengameart.org/sites/default/files/leaf1.png', // leaf litter
+  'https://opengameart.org/sites/default/files/shortgrass.png', // short grass clumps
+];
+
 // --- ZONES (Areas of Ottawa) ---
 export const ZONES: Zone[] = [
   { name: 'ByWard Market', rect: [2400, 1900, 500, 500], spawnMultiplier: 1.6 },
@@ -98,24 +112,6 @@ export const ZONES: Zone[] = [
   { name: 'Chinatown', rect: [1000, 3000, 400, 800], spawnMultiplier: 1.1 }
 ];
 
-// Roughly following real geometry: canal from Dow's Lake to Parliament, etc.
-const RIDEAU_CANAL_POLY: Vector2[] = [
-  { x: 1400, y: 1200 },
-  { x: 1420, y: 1500 },
-  { x: 1380, y: 2000 },
-  { x: 1430, y: 2500 },
-  { x: 1480, y: 3500 },
-  { x: 1530, y: 4500 },
-  { x: 1550, y: 6000 },
-  { x: 1750, y: 6000 },
-  { x: 1730, y: 4500 },
-  { x: 1680, y: 3500 },
-  { x: 1630, y: 2500 },
-  { x: 1580, y: 2000 },
-  { x: 1620, y: 1500 },
-  { x: 1600, y: 1200 }
-];
-
 // Ottawa River strip at the north edge
 const OTTAWA_RIVER_POLY: Vector2[] = [
   { x: 0, y: 1100 },
@@ -125,7 +121,6 @@ const OTTAWA_RIVER_POLY: Vector2[] = [
 ];
 
 export const WATER_BODIES: WaterBody[] = [
-  { name: 'Rideau Canal', polygon: RIDEAU_CANAL_POLY },
   { name: 'Ottawa River', polygon: OTTAWA_RIVER_POLY }
 ];
 
@@ -335,43 +330,48 @@ export const TRAFFIC_PATHS = [
   [{ x: 100, y: 2850 }, { x: 1000, y: 2850 }] // Wellington West
 ];
 
-// --- Roads (screen-space geometry approximating downtown Ottawa) ---
+// --- Roads (grid-ish layout approximating downtown Ottawa) ---
 export const ROADS: RoadSegment[] = [
-  // North-south
-  { id: 'elgin', from: { x: 1850, y: 1200 }, to: { x: 1850, y: 5000 }, width: 150 },
-  { id: 'bronson', from: { x: 1250, y: 2600 }, to: { x: 1250, y: 5200 }, width: 150 },
-  { id: 'bank', from: { x: 1750, y: 1800 }, to: { x: 1750, y: 5200 }, width: 140 },
-  { id: 'sussex', from: { x: 2400, y: 1400 }, to: { x: 2400, y: 2600 }, width: 120 },
+  // North-south spine (roughly matching Bronson → Preston → Bank → Elgin → Sussex)
+  { id: 'bronson', from: { x: 1200, y: 1400 }, to: { x: 1200, y: 5200 }, width: 150 },
+  { id: 'preston', from: { x: 1450, y: 2600 }, to: { x: 1450, y: 5200 }, width: 130 }, // Little Italy axis
+  { id: 'bank', from: { x: 1750, y: 1600 }, to: { x: 1750, y: 5200 }, width: 140 }, // Bank through Centretown/Glebe
+  { id: 'elgin', from: { x: 1900, y: 1600 }, to: { x: 1900, y: 5200 }, width: 130 }, // Elgin near Parliament
+  { id: 'sussex', from: { x: 2400, y: 1350 }, to: { x: 2400, y: 2600 }, width: 120 }, // Sussex / ByWard edge
 
-  // East-west
-  { id: 'wellington', from: { x: 800, y: 2100 }, to: { x: 3200, y: 2100 }, width: 160 },
-  { id: 'rideau', from: { x: 2100, y: 2300 }, to: { x: 2800, y: 2300 }, width: 140 },
+  // East-west streets (stacked grid)
+  { id: 'wellington', from: { x: 800, y: 2100 }, to: { x: 3200, y: 2100 }, width: 160 }, // Parliament frontage
+  { id: 'rideau', from: { x: 2100, y: 2300 }, to: { x: 2800, y: 2300 }, width: 140 }, // Rideau / ByWard / uOttawa
+  { id: 'somerset', from: { x: 800, y: 2800 }, to: { x: 2800, y: 2800 }, width: 140 }, // Hintonburg → Chinatown → Centretown north
+  { id: 'gladstone', from: { x: 800, y: 3100 }, to: { x: 2800, y: 3100 }, width: 140 }, // Hintonburg → Little Italy → Centretown south
+  { id: 'fifth', from: { x: 1400, y: 3800 }, to: { x: 2400, y: 3800 }, width: 140 }, // Through the Glebe (Fifth / Lansdowne area)
+  { id: 'carling', from: { x: 1200, y: 4600 }, to: { x: 2600, y: 4600 }, width: 160 }, // Carling / Dow's Lake belt
 
   // Bridges (kept separate so they can render differently if needed)
   {
     id: 'bridge_macdonald_cartier',
     from: { x: 3000, y: 1500 },
     to: { x: 3000, y: 900 },
-    width: 130
+    width: 130,
   },
   {
     id: 'bridge_portage',
     from: { x: 1800, y: 1500 },
     to: { x: 1800, y: 900 },
-    width: 130
+    width: 130,
   },
   {
     id: 'bridge_chaudiere',
     from: { x: 1200, y: 1500 },
     to: { x: 1200, y: 900 },
-    width: 130
+    width: 130,
   },
   {
     id: 'bridge_champlain',
     from: { x: 500, y: 1600 },
     to: { x: 500, y: 900 },
-    width: 140
-  }
+    width: 140,
+  },
 ];
 
 // Road-label text per ID (kept separate from RoadSegment type)
@@ -382,10 +382,15 @@ export const ROAD_LABELS: Record<string, string> = {
   bank: 'BANK ST',
   sussex: 'SUSSEX DR',
   rideau: 'RIDEAU ST',
+  somerset: 'SOMERSET ST W',
+  gladstone: 'GLADSTONE AVE',
+  fifth: 'FIFTH AVE',
+  carling: 'CARLING AVE',
+  preston: 'PRESTON ST',
   bridge_macdonald_cartier: 'MACDONALD-CARTIER BRIDGE',
   bridge_portage: 'PORTAGE BRIDGE',
   bridge_chaudiere: 'CHAUDIÈRE CROSSING',
-  bridge_champlain: 'CHAMPLAIN BRIDGE'
+  bridge_champlain: 'CHAMPLAIN BRIDGE',
 };
 
 export const CROSSWALKS: Crosswalk[] = [
