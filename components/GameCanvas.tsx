@@ -899,8 +899,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const spriteImg = loadedImages[spriteUrl];
 
         if (spriteImg && !hasBicycle) {
-          const targetWidth = 96;
-          const targetHeight = 96;
+          const targetWidth = 48;
+          const targetHeight = 48;
           const direction = player.facing === 'left' ? -1 : 1;
           const previousSmoothing = ctx.imageSmoothingEnabled;
           ctx.save();

@@ -82,6 +82,7 @@ const translations: Record<string, Record<Language, string>> = {
   'toast_detour': { en: 'Detour! Alexandra Bridge is under repair.', fr: 'Détour ! Le pont Alexandra est en réparation.' },
   'toast_need_bridge': { en: 'Find a bridge to cross the river!', fr: 'Trouvez un pont pour traverser la rivière !' },
   'toast_stash_full': { en: 'Stash is full!', fr: 'La planque est pleine !' },
+  'toast_quest_complete': { en: 'Quest complete! Reward collected.', fr: 'Quête terminée ! Récompense obtenue.' },
 
   // Landmarks
   'landmark_parliament': { en: 'Parliament Hill', fr: 'Colline du Parlement' },

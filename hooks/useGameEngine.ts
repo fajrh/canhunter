@@ -15,6 +15,7 @@ import type {
   NPCType,
   UIState,
   Zone,
+  Quest,
 } from '../types.ts';
 import {
   REFUND_DEPOT_POSITION,
@@ -29,6 +30,7 @@ import {
   ZONES,
   UPGRADES,
   QUESTS,
+  QUEST_ANYWHERE,
   HOUSES,
   WATER_BODIES,
   BRIDGES,
@@ -380,6 +382,22 @@ const getInitialPlayerState = (): PlayerState => ({
   invulnerableTimer: 0,
 });
 
+const normalizeQuest = (quest?: Quest | null): Quest | null => {
+  if (!quest) return null;
+  return {
+    ...quest,
+    targetZone: quest.targetZone || QUEST_ANYWHERE,
+    progress: quest.progress ?? 0,
+  };
+};
+
+const getNextQuest = (currentQuestId: number): Quest | null => {
+  const currentIndex = QUESTS.findIndex((q) => q.id === currentQuestId);
+  if (currentIndex === -1) return null;
+  const nextQuest = QUESTS[currentIndex + 1];
+  return nextQuest ? { ...nextQuest, progress: 0 } : null;
+};
+
 // temp canvas for measuring chat bubble text
 const tempCtx = document.createElement('canvas').getContext('2d')!;
 tempCtx.font = 'bold 8pt Arial';
@@ -429,6 +447,11 @@ export const useGameEngine = () => {
   if (gameState.current === null) {
     const saved = saveService.loadGame();
     const basePlayer = getInitialPlayerState();
+    const startingQuest = normalizeQuest(saved?.activeQuest) || {
+      ...QUESTS[0],
+      progress: 0,
+      targetZone: QUEST_ANYWHERE,
+    };
     const playerState: PlayerState = saved
       ? {
           ...basePlayer,
@@ -464,7 +487,7 @@ export const useGameEngine = () => {
       foliage: FOLIAGE,
       camera: { ...playerState.position },
       gameTime: saved?.gameTime || 0,
-      activeQuest: saved?.activeQuest || { ...QUESTS[0], progress: 0 },
+      activeQuest: startingQuest,
       lastSellTime: saved?.lastSellTime || 0,
       flyingCans: [],
       flyingCanIdCounter: 0,
@@ -519,6 +542,42 @@ export const useGameEngine = () => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), duration);
   };
+
+  const applyQuestProgress = useCallback(
+    (state: GameState, collected: { collectible: Collectible; zone?: Zone }[]) => {
+      let currentQuest = state.activeQuest;
+      if (!currentQuest) return;
+
+    let remainingEligible = collected.filter(
+      (c) =>
+        currentQuest &&
+        (currentQuest.targetZone === QUEST_ANYWHERE ||
+          c.zone?.name === currentQuest.targetZone),
+    ).length;
+
+    while (currentQuest && remainingEligible > 0) {
+      const needed = currentQuest.targetCount - currentQuest.progress;
+      const applied = Math.min(remainingEligible, needed);
+      currentQuest.progress += applied;
+      remainingEligible -= applied;
+
+      if (currentQuest.progress >= currentQuest.targetCount) {
+        state.player.money += currentQuest.reward;
+        state.floatingTexts.push({
+          id: effectIdCounter.current++,
+          text: `+$${currentQuest.reward.toFixed(2)}`,
+          position: { ...state.player.position, y: state.player.position.y - 32 },
+          life: 1.2,
+          color: '#FFD700',
+        });
+        setToast('toast_quest_complete', 3500);
+        const nextQuest = getNextQuest(currentQuest.id);
+        state.activeQuest = nextQuest;
+        currentQuest = state.activeQuest;
+      }
+    }
+  },
+  [setToast]);
   const clearToast = () => setToastMessage(null);
 
   const gameLoop = useCallback(
@@ -874,14 +933,7 @@ export const useGameEngine = () => {
             audioService.playBoostSound();
           }
 
-          if (state.activeQuest) {
-            const questItems = collectedForInventory.filter(
-              (c) =>
-                !state.activeQuest!.targetZone ||
-                c.zone?.name === state.activeQuest!.targetZone,
-            );
-            state.activeQuest.progress += questItems.length;
-          }
+          applyQuestProgress(state, collectedForInventory);
         }
       }
 
@@ -934,7 +986,7 @@ export const useGameEngine = () => {
 
       animationFrameIdRef.current = requestAnimationFrame(gameLoop);
     },
-    [setToast],
+    [setToast, applyQuestProgress],
   );
 
   // UI update loop

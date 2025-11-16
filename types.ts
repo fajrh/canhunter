@@ -39,7 +39,7 @@ export interface Upgrade {
 export interface Quest {
   id: number;
   descriptionKey: string;
-  targetZone: string | null;
+  targetZone: string;
   targetCount: number;
   reward: number;
   progress: number;
