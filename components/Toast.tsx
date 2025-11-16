@@ -26,9 +26,10 @@ const Toast: React.FC<ToastProps> = ({ messageKey, onDismiss, language }) => {
 
   return (
     <div
-      className={`absolute top-20 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full bg-blue-500 text-white font-bold shadow-lg transition-all duration-300 pointer-events-none text-center ${
+      className={`absolute left-1/2 -translate-x-1/2 px-6 py-3 rounded-full bg-blue-500 text-white font-bold shadow-lg transition-all duration-300 pointer-events-none text-center ${
         isVisible && messageKey ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-5'
       }`}
+      style={{ top: '150px' }}
     >
       {messageKey ? t(messageKey, language) : ''}
     </div>

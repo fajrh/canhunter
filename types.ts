@@ -93,6 +93,7 @@ export type Landmark = {
   nameKey: string;
   position: Vector2;
   emoji?: string;
+  imageUrl?: string;
 };
 
 export interface FlyingCan {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import GameCanvas from './components/GameCanvas';
 import Hud from './components/Hud';
 import Controls from './components/Controls';
@@ -11,19 +11,6 @@ import HelpModal from './components/HelpModal';
 import { t } from './services/localization';
 import FlashMessage from './components/FlashMessage';
 import InventoryFullPrompt from './components/InventoryFullPrompt';
-
-const CashOutAnimation = ({ onFinish }: { onFinish: () => void }) => {
-  useEffect(() => {
-    const timer = setTimeout(onFinish, 4000);
-    return () => clearTimeout(timer);
-  }, [onFinish]);
-
-  return (
-    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-50 text-white text-center">
-      <div className="text-6xl animate-bounce">🚲</div>
-    </div>
-  );
-};
 
 export default function App() {
   const [isUpgradesOpen, setIsUpgradesOpen] = useState(false);
