@@ -284,12 +284,12 @@ const ensureInitialCollectibles = (state: GameState, idCounter: MutableRefObject
   if (state.collectibles.length >= INITIAL_COLLECTIBLE_TARGET) return;
 
   // A little cluster near player
-  scatterCollectiblesAround(state, state.player.position, 320, 24, idCounter);
+  scatterCollectiblesAround(state, state.player.position, 320, 5, idCounter);
   scatterCollectiblesAround(
     state,
     { x: state.player.position.x + 260, y: state.player.position.y - 220 },
     360,
-    14,
+    3,
     idCounter,
   );
 
