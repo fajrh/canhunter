@@ -1,3 +1,4 @@
+// GameCanvas.tsx
 import React, { useRef, useEffect, useState } from 'react';
 import type { GameState, Vector2, ChatBubble } from '../types.ts';
 import {
@@ -148,7 +149,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   });
   const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
 
-  // --- Asset loading (cans, critters, road tile, landmark images) ---
+  // --- Asset loading (cans, critters, road tile, landmark images, extra sprites) ---
   useEffect(() => {
     const landmarkImageUrls = LANDMARKS.filter(
       (landmark) => Boolean(landmark.imageUrl),
@@ -666,8 +667,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const { x, y } = worldToScreen(obj.position, camera, canvasSize);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.font =
-          obj.type === 'other' ? '24px sans-serif' : '30px sans-serif';
+        ctx.font = obj.type === 'other' ? '24px sans-serif' : '30px sans-serif';
         ctx.fillText(obj.emoji, x, y);
       });
 
@@ -793,6 +793,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.fillText('🏪', depotScreenPos.x, depotScreenPos.y);
+
       const stashScreenPos = worldToScreen(stashHouse, camera, canvasSize);
       const stashImg = loadedImages[SPRITE_STASH_HOUSE_URL];
       if (stashImg) {
@@ -959,10 +960,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       {!allAssetsLoaded && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-1/2 max-w-sm pointer-events-none">
           <p className="text-white text-center text-sm text-outline">
-            {t(
-              'loading_assets',
-              gameStateRef.current?.language || 'en',
-            )}
+            {t('loading_assets', gameStateRef.current?.language || 'en')}
           </p>
           <div className="w-full bg-gray-600 rounded-full h-2.5 mt-1 border-2 border-white/50">
             <div

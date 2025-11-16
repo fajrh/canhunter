@@ -1,3 +1,4 @@
+// constants.ts
 import type {
   Zone,
   Upgrade,
@@ -28,8 +29,6 @@ const mulberry32 = (seed: number) => {
   };
 };
 const rand2 = (rng: () => number, a: number, b: number) => a + (b - a) * rng();
-
-type Polyline = Vector2[];
 
 const pointInPoly = (pt: Vector2, poly: Vector2[]) => {
   let inside = false;
@@ -97,7 +96,7 @@ export const WATER_TILE_URL =
 export const DETAIL_TEXTURE_URLS = [
   'https://opengameart.org/sites/default/files/flowers_5.png', // flowers patch
   'https://opengameart.org/sites/default/files/leaf1.png', // leaf litter
-  'https://opengameart.org/sites/default/files/shortgrass.png', // short grass clumps
+  'https://opengameart.org/sites/default/files/shortgrass.png' // short grass clumps
 ];
 
 // --- Custom Sprites (Ottawa-specific) ---
@@ -178,7 +177,7 @@ export const HOUSES: House[] = [
   ...createHouseCluster({ x: 3000, y: 1900 }, 9, 200)
 ];
 
-// --- Bridges ---
+// --- Bridges (world data) ---
 export const BRIDGES: Bridge[] = [
   // East to west across the river, roughly matching real order
   {
