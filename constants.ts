@@ -126,6 +126,7 @@ export const ZONES: Zone[] = [
 ];
 
 // Ottawa River strip at the north edge
+// Draw this *over* roads in your renderer, and then draw bridges on top.
 const OTTAWA_RIVER_POLY: Vector2[] = [
   { x: 0, y: 1100 },
   { x: 4000, y: 1100 },
@@ -141,6 +142,7 @@ export const isPointInWater = (point: Vector2): boolean =>
   WATER_BODIES.some((wb) => pointInPoly(point, wb.polygon));
 
 // --- Ontario/Quebec separation ---
+// You can still draw a border line at QUEBEC_BORDER_Y over everything.
 export const QUEBEC_BORDER_Y = 1120;
 export const isInQuebec = (p: Vector2) => p.y < QUEBEC_BORDER_Y;
 
@@ -164,7 +166,7 @@ const createHouseCluster = (
       y: center.y + Math.sin(angle) * distance
     };
     if (!isPointInWater(housePos)) houses.push({ position: housePos });
-    }
+  }
   return houses;
 };
 
@@ -180,48 +182,50 @@ export const HOUSES: House[] = [
 ];
 
 // --- Bridges (world data) ---
+// rect spans exactly over the water band (y≈1100–1250) so you can
+// 1) draw water as a big strip
+// 2) draw these rects on top as solid bridge decks.
 export const BRIDGES: Bridge[] = [
   // East to west across the river, roughly matching real order
   {
     name: 'Macdonald-Cartier Bridge',
     nameKey: 'bridge_macdonald_cartier',
-    from: { x: 3000, y: 1260 },
-    to: { x: 3000, y: 1090 },
-    rect: [2980, 1090, 40, 170]
+    from: { x: 3000, y: 1500 },
+    to: { x: 3000, y: 900 },
+    rect: [2965, 1100, 70, 150]
   },
   {
     name: 'Alexandra Bridge',
     nameKey: 'bridge_alexandra',
-    from: { x: 2300, y: 1260 },
-    to: { x: 2300, y: 1090 },
-    rect: [2280, 1090, 40, 170],
+    from: { x: 2300, y: 1500 },
+    to: { x: 2300, y: 900 },
+    rect: [2265, 1100, 70, 150],
     repairGag: true
   },
   {
     name: 'Portage Bridge',
     nameKey: 'bridge_portage',
-    from: { x: 1800, y: 1260 },
-    to: { x: 1800, y: 1090 },
-    rect: [1780, 1090, 40, 170]
+    from: { x: 1800, y: 1500 },
+    to: { x: 1800, y: 900 },
+    rect: [1765, 1100, 70, 150]
   },
   {
     name: 'Chaudière Crossing',
     nameKey: 'bridge_chaudiere',
-    from: { x: 1200, y: 1260 },
-    to: { x: 1200, y: 1090 },
-    rect: [1180, 1090, 40, 170]
+    from: { x: 1200, y: 1500 },
+    to: { x: 1200, y: 900 },
+    rect: [1165, 1100, 70, 150]
   },
   {
     name: 'Champlain Bridge',
     nameKey: 'bridge_champlain',
-    from: { x: 500, y: 1260 },
-    to: { x: 500, y: 1090 },
-    rect: [480, 1090, 40, 170]
+    from: { x: 500, y: 1500 },
+    to: { x: 500, y: 900 },
+    rect: [465, 1100, 70, 150]
   }
 ];
 
 // --- Landmarks ---
-// Positions are approximate but keep real relative layout: Parliament / ByWard / uOttawa / Lansdowne / Dow's Lake…
 export const LANDMARKS: Landmark[] = [
   {
     nameKey: 'landmark_parliament',
@@ -266,7 +270,7 @@ export const LANDMARKS: Landmark[] = [
     imageUrl: 'https://i.ibb.co/k617h4FG/Chat-GPT-Image-Nov-15-2025-01-29-38-PM.png'
   },
 
-  // Glebe / Dow's Lake etc. (emoji-only is fine)
+  // Glebe / Dow's Lake etc.
   { nameKey: 'landmark_lansdowne', position: { x: 1850, y: 4300 }, emoji: '🏟️' },
   { nameKey: 'landmark_dows_lake', position: { x: 1650, y: 4700 }, emoji: '🛶' },
   { nameKey: 'landmark_little_italy', position: { x: 1500, y: 4100 }, emoji: '🍝' },
@@ -296,30 +300,26 @@ export const LANDMARKS: Landmark[] = [
   },
 
   // Sprite-based flavour landmarks:
-
-  // Ottawa Police cruiser parked just off Elgin/Wellington
   {
+    // Ottawa Police cruiser parked just off Elgin/Wellington
     position: { x: 1950, y: 2150 },
     emoji: '🚓',
     imageUrl: SPRITE_POLICE_CAR_URL
   },
-
-  // OC Transpo bus on Bank near Somerset
   {
+    // OC Transpo bus on Bank near Somerset
     position: { x: 1750, y: 2850 },
     emoji: '🚌',
     imageUrl: SPRITE_OC_TRANSPO_BUS_URL
   },
-
-  // Blue bin cluster near your stash / Centretown houses
   {
+    // Blue bin cluster near stash @ Gladstone & Bronson
     position: { x: 1500, y: 3150 },
     emoji: '♻️',
     imageUrl: SPRITE_RECYCLE_BIN_URL
   },
-
-  // Stash house sprite at Gladstone & Bronson
   {
+    // Stash house sprite at Gladstone & Bronson
     position: { x: 1450, y: 3100 }, // matches STASH_HOUSE_POSITION
     emoji: '🏚️',
     imageUrl: SPRITE_STASH_HOUSE_URL
@@ -376,16 +376,16 @@ export const FOLIAGE: Foliage[] = [
 ];
 
 // --- Traffic ---
-// Snapped to the new road grid (Elgin, Wellington, Bronson, Somerset West)
+// Snapped to road grid and kept out of the water band.
 export const TRAFFIC_PATHS = [
-  // Elgin St: north–south along x = 1950
-  [{ x: 1950, y: 0 }, { x: 1950, y: 3200 }],
+  // Elgin St: north–south along x = 1950, starting south of river
+  [{ x: 1950, y: 1300 }, { x: 1950, y: 3200 }],
 
   // Wellington St: east–west along y = 2100
   [{ x: 0, y: 2100 }, { x: GAME_WORLD_SIZE.width, y: 2100 }],
 
-  // Bronson Ave: north–south along x = 1450
-  [{ x: 1450, y: 0 }, { x: 1450, y: GAME_WORLD_SIZE.height }],
+  // Bronson Ave: north–south along x = 1450, staying out of river band
+  [{ x: 1450, y: 1300 }, { x: 1450, y: GAME_WORLD_SIZE.height }],
 
   // Somerset St W: east–west in Hintonburg/Chinatown along y = 2800
   [{ x: 0, y: 2800 }, { x: 1400, y: 2800 }]
@@ -395,110 +395,110 @@ export const TRAFFIC_PATHS = [
 // X order west→east: Preston, Bronson, Bank, Elgin, Sussex
 // Y order north→south: Wellington, Rideau, Somerset, Gladstone, Queensway, Fifth, Carling
 export const ROADS: RoadSegment[] = [
-  // North–south arterials (edge-to-edge)
+  // North–south arterials (start just south of river so they don't visually cross water)
   {
     id: 'preston',
-    from: { x: 1300, y: 0 },
+    from: { x: 1300, y: 1300 },
     to: { x: 1300, y: GAME_WORLD_SIZE.height },
-    width: 65 // was 130
+    width: 65 // half of old 130
   },
   {
     id: 'bronson',
-    from: { x: 1450, y: 0 },
+    from: { x: 1450, y: 1300 },
     to: { x: 1450, y: GAME_WORLD_SIZE.height },
-    width: 75 // was 150
+    width: 75 // half of old 150
   },
   {
     id: 'bank',
-    from: { x: 1750, y: 0 },
+    from: { x: 1750, y: 1300 },
     to: { x: 1750, y: GAME_WORLD_SIZE.height },
-    width: 70 // was 140
+    width: 70 // half of old 140
   },
   {
     id: 'elgin',
-    from: { x: 1950, y: 0 },
+    from: { x: 1950, y: 1300 },
     to: { x: 1950, y: GAME_WORLD_SIZE.height },
-    width: 65 // was 130
+    width: 65 // half of old 130
   },
   {
     id: 'sussex',
-    from: { x: 2450, y: 0 },
+    from: { x: 2450, y: 1300 },
     to: { x: 2450, y: GAME_WORLD_SIZE.height },
-    width: 60 // was 120
+    width: 60 // half of old 120
   },
 
-  // East–west streets (edge-to-edge)
+  // East–west streets (all south of river already)
   {
     id: 'wellington',
     from: { x: 0, y: 2100 },
     to: { x: GAME_WORLD_SIZE.width, y: 2100 },
-    width: 80 // was 160
+    width: 80 // half of old 160
   },
   {
     id: 'rideau',
     from: { x: 0, y: 2300 },
     to: { x: GAME_WORLD_SIZE.width, y: 2300 },
-    width: 70 // was 140
+    width: 70 // half of old 140
   },
   {
     id: 'somerset',
     from: { x: 0, y: 2800 },
     to: { x: GAME_WORLD_SIZE.width, y: 2800 },
-    width: 70 // was 140
+    width: 70 // half of old 140
   },
   {
     id: 'gladstone',
     from: { x: 0, y: 3100 },
     to: { x: GAME_WORLD_SIZE.width, y: 3100 },
-    width: 70 // was 140
+    width: 70 // half of old 140
   },
   {
     id: 'queensway',
     from: { x: 0, y: 3350 },
     to: { x: GAME_WORLD_SIZE.width, y: 3350 },
-    width: 90 // was 180
+    width: 90 // half of old 180
   },
   {
     id: 'fifth',
     from: { x: 0, y: 3800 },
     to: { x: GAME_WORLD_SIZE.width, y: 3800 },
-    width: 70 // was 140
+    width: 70 // half of old 140
   },
   {
     id: 'carling',
     from: { x: 0, y: 4600 },
     to: { x: GAME_WORLD_SIZE.width, y: 4600 },
-    width: 80 // was 160
+    width: 80 // half of old 160
   },
 
-  // Bridges across the Ottawa River (kept as “exceptional” segments)
+  // Bridges across the Ottawa River (exception segments that DO cross water)
   {
     id: 'bridge_macdonald_cartier',
     from: { x: 3000, y: 1500 },
     to: { x: 3000, y: 900 },
-    width: 65 // was 130
+    width: 65
   },
   {
     id: 'bridge_portage',
     from: { x: 1800, y: 1500 },
     to: { x: 1800, y: 900 },
-    width: 65 // was 130
+    width: 65
   },
   {
     id: 'bridge_chaudiere',
     from: { x: 1200, y: 1500 },
     to: { x: 1200, y: 900 },
-    width: 65 // was 130
+    width: 65
   },
   {
     id: 'bridge_champlain',
     from: { x: 500, y: 1600 },
     to: { x: 500, y: 900 },
-    width: 70 // was 140
+    width: 70
   }
 ];
 
-// Road-label text per ID (kept separate from RoadSegment type)
+// Road-label text per ID
 export const ROAD_LABELS: Record<string, string> = {
   elgin: 'ELGIN ST',
   wellington: 'WELLINGTON ST',
