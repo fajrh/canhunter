@@ -15,8 +15,8 @@ import type {
 } from './types.ts';
 
 export const GAME_WORLD_SIZE = { width: 4000, height: 6000 };
-export const MAX_COLLECTIBLES = 1500;
-export const INITIAL_COLLECTIBLE_TARGET = 140;
+export const MAX_COLLECTIBLES = 300;
+export const INITIAL_COLLECTIBLE_TARGET = 28;
 
 // --- Helpers (seeded RNG + geometry) ---
 const mulberry32 = (seed: number) => {
@@ -28,8 +28,6 @@ const mulberry32 = (seed: number) => {
   };
 };
 const rand2 = (rng: () => number, a: number, b: number) => a + (b - a) * rng();
-
-type Polyline = Vector2[];
 
 const pointInPoly = (pt: Vector2, poly: Vector2[]) => {
   let inside = false;
@@ -66,6 +64,8 @@ export const PLAYER_RADIUS = 30;
 export const COLLECTIBLE_RADIUS = 20;
 export const COLLECTIBLE_LIFESPAN = 10 * 60 * 1000; // 10 minutes
 export const COLLECTIBLE_VALUE = 0.1; // $0.10
+export const RECYCLING_BIN_BONUS_ITEMS = 6; // bins grant multiple cans
+export const RECYCLING_BIN_SPAWN_CHANCE = 0.08; // chance a spawn becomes a bin
 export const SPEED_BOOST_CHAIN_WINDOW = 5000; // ms to maintain chain
 export const SPEED_BOOST_CHAIN_THRESHOLD = 5; // items in chain to trigger boost
 export const SPEED_BOOST_BATCH_TRIGGER = 3; // items grabbed at once to trigger boost
@@ -86,6 +86,32 @@ export const ROAD_SIGN_GREEN_BORDER = '#1f3330';
 export const ROAD_TEXTURE_URL = 'https://i.ibb.co/s9V8fFRv/download.jpg';
 export const ROAD_TILE_SIZE = 64;
 
+// --- World textures (OpenGameArt tiles) ---
+export const GROUND_TEXTURE_URL =
+  'https://opengameart.org/sites/default/files/grass03_0.png'; // Seamless Grass Texture II
+
+export const WATER_TILE_URL =
+  'https://opengameart.org/sites/default/files/y2k_water_texture.png'; // Y2K water
+
+// Optional decorative overlays (for later / future polish)
+export const DETAIL_TEXTURE_URLS = [
+  'https://opengameart.org/sites/default/files/flowers_5.png', // flowers patch
+  'https://opengameart.org/sites/default/files/leaf1.png', // leaf litter
+  'https://opengameart.org/sites/default/files/shortgrass.png', // short grass clumps
+];
+
+// --- Custom Sprites (Ottawa-specific) ---
+export const SPRITE_POLICE_CAR_URL =
+  'https://i.ibb.co/p6VkbGNf/police.png';
+export const SPRITE_RECYCLE_BIN_URL =
+  'https://i.ibb.co/YB1wrH0n/recyclebin.png';
+export const SPRITE_CHINATOWN_GATE_URL =
+  'https://i.ibb.co/67TbNxbc/chinatown.png';
+export const SPRITE_STASH_HOUSE_URL =
+  'https://i.ibb.co/3mSP69WD/stashhouse.png';
+export const SPRITE_OC_TRANSPO_BUS_URL =
+  'https://i.ibb.co/0yJHmfHB/bus.png';
+
 // --- ZONES (Areas of Ottawa) ---
 export const ZONES: Zone[] = [
   { name: 'ByWard Market', rect: [2400, 1900, 500, 500], spawnMultiplier: 1.6 },
@@ -98,24 +124,6 @@ export const ZONES: Zone[] = [
   { name: 'Chinatown', rect: [1000, 3000, 400, 800], spawnMultiplier: 1.1 }
 ];
 
-// Roughly following real geometry: canal from Dow's Lake to Parliament, etc.
-const RIDEAU_CANAL_POLY: Vector2[] = [
-  { x: 1400, y: 1200 },
-  { x: 1420, y: 1500 },
-  { x: 1380, y: 2000 },
-  { x: 1430, y: 2500 },
-  { x: 1480, y: 3500 },
-  { x: 1530, y: 4500 },
-  { x: 1550, y: 6000 },
-  { x: 1750, y: 6000 },
-  { x: 1730, y: 4500 },
-  { x: 1680, y: 3500 },
-  { x: 1630, y: 2500 },
-  { x: 1580, y: 2000 },
-  { x: 1620, y: 1500 },
-  { x: 1600, y: 1200 }
-];
-
 // Ottawa River strip at the north edge
 const OTTAWA_RIVER_POLY: Vector2[] = [
   { x: 0, y: 1100 },
@@ -125,7 +133,6 @@ const OTTAWA_RIVER_POLY: Vector2[] = [
 ];
 
 export const WATER_BODIES: WaterBody[] = [
-  { name: 'Rideau Canal', polygon: RIDEAU_CANAL_POLY },
   { name: 'Ottawa River', polygon: OTTAWA_RIVER_POLY }
 ];
 
@@ -257,6 +264,8 @@ export const LANDMARKS: Landmark[] = [
     emoji: '🌳',
     imageUrl: 'https://i.ibb.co/k617h4FG/Chat-GPT-Image-Nov-15-2025-01-29-38-PM.png'
   },
+
+  // Glebe / Dow's Lake etc. (emoji-only is fine)
   { nameKey: 'landmark_lansdowne', position: { x: 1850, y: 4300 }, emoji: '🏟️' },
   { nameKey: 'landmark_dows_lake', position: { x: 1650, y: 4700 }, emoji: '🛶' },
   { nameKey: 'landmark_little_italy', position: { x: 1500, y: 4100 }, emoji: '🍝' },
@@ -265,7 +274,15 @@ export const LANDMARKS: Landmark[] = [
   { nameKey: 'landmark_war_museum', position: { x: 1450, y: 2050 }, emoji: '🪖' },
   { nameKey: 'landmark_supreme_court', position: { x: 1650, y: 2050 }, emoji: '⚖️' },
   { nameKey: 'landmark_chateau_laurier', position: { x: 2150, y: 2100 }, emoji: '🏰' },
-  { nameKey: 'landmark_chinatown', position: { x: 1200, y: 3000 }, emoji: '🏮' },
+
+  // Chinatown gate – uses your sprite
+  {
+    nameKey: 'landmark_chinatown',
+    position: { x: 1200, y: 3000 }, // sits right on Somerset
+    emoji: '🏮',
+    imageUrl: SPRITE_CHINATOWN_GATE_URL
+  },
+
   { nameKey: 'landmark_glebe', position: { x: 1850, y: 3800 }, emoji: '🏘️' },
   { nameKey: 'landmark_tunneys_pasture', position: { x: 800, y: 2500 }, emoji: '🏢' },
   { nameKey: 'landmark_bayview', position: { x: 1100, y: 2550 }, emoji: '🚉' },
@@ -275,6 +292,36 @@ export const LANDMARKS: Landmark[] = [
     nameKey: 'landmark_jacques_cartier_park',
     position: { x: 2600, y: 900 },
     emoji: '🌲'
+  },
+
+  // Sprite-based flavour landmarks:
+
+  // Ottawa Police cruiser parked just off Elgin/Wellington
+  {
+    position: { x: 1950, y: 2150 },
+    emoji: '🚓',
+    imageUrl: SPRITE_POLICE_CAR_URL
+  },
+
+  // OC Transpo bus on Bank near Somerset
+  {
+    position: { x: 1750, y: 2850 },
+    emoji: '🚌',
+    imageUrl: SPRITE_OC_TRANSPO_BUS_URL
+  },
+
+  // Blue bin cluster near your stash / Centretown houses
+  {
+    position: { x: 1800, y: 3650 },
+    emoji: '♻️',
+    imageUrl: SPRITE_RECYCLE_BIN_URL
+  },
+
+  // Stash house sprite in Centretown/Glebe border
+  {
+    position: { x: 1800, y: 3700 }, // matches STASH_HOUSE_POSITION
+    emoji: '🏚️',
+    imageUrl: SPRITE_STASH_HOUSE_URL
   }
 ];
 
@@ -335,43 +382,51 @@ export const TRAFFIC_PATHS = [
   [{ x: 100, y: 2850 }, { x: 1000, y: 2850 }] // Wellington West
 ];
 
-// --- Roads (screen-space geometry approximating downtown Ottawa) ---
+// --- Roads (grid-ish layout approximating downtown Ottawa) ---
+// X order west→east: Preston, Bronson, Bank, Elgin, Sussex
+// Y order north→south: Wellington, Rideau, Somerset, Gladstone, Queensway, Fifth, Carling
 export const ROADS: RoadSegment[] = [
-  // North-south
-  { id: 'elgin', from: { x: 1850, y: 1200 }, to: { x: 1850, y: 5000 }, width: 150 },
-  { id: 'bronson', from: { x: 1250, y: 2600 }, to: { x: 1250, y: 5200 }, width: 150 },
-  { id: 'bank', from: { x: 1750, y: 1800 }, to: { x: 1750, y: 5200 }, width: 140 },
-  { id: 'sussex', from: { x: 2400, y: 1400 }, to: { x: 2400, y: 2600 }, width: 120 },
+  // North–south arterials
+  { id: 'preston', from: { x: 1300, y: 2600 }, to: { x: 1300, y: 5200 }, width: 130 }, // Little Italy axis (west of Bronson)
+  { id: 'bronson', from: { x: 1450, y: 1400 }, to: { x: 1450, y: 5200 }, width: 150 }, // Bronson Ave
+  { id: 'bank', from: { x: 1750, y: 1600 }, to: { x: 1750, y: 5200 }, width: 140 }, // Bank St
+  { id: 'elgin', from: { x: 1950, y: 1600 }, to: { x: 1950, y: 5200 }, width: 130 }, // Elgin St
+  { id: 'sussex', from: { x: 2450, y: 1350 }, to: { x: 2450, y: 2600 }, width: 120 }, // Sussex Dr into ByWard
 
-  // East-west
-  { id: 'wellington', from: { x: 800, y: 2100 }, to: { x: 3200, y: 2100 }, width: 160 },
-  { id: 'rideau', from: { x: 2100, y: 2300 }, to: { x: 2800, y: 2300 }, width: 140 },
+  // East–west streets
+  { id: 'wellington', from: { x: 800, y: 2100 }, to: { x: 3200, y: 2100 }, width: 160 }, // Parliament frontage
+  { id: 'rideau', from: { x: 2100, y: 2300 }, to: { x: 2800, y: 2300 }, width: 140 }, // Rideau St / ByWard / uOttawa
+  { id: 'somerset', from: { x: 800, y: 2800 }, to: { x: 2800, y: 2800 }, width: 140 }, // Chinatown ↔ Centretown (Somerset St W)
+  { id: 'gladstone', from: { x: 800, y: 3100 }, to: { x: 2800, y: 3100 }, width: 140 }, // Gladstone Ave (Hintonburg/Little Italy/Centretown)
+  { id: 'queensway', from: { x: 600, y: 3350 }, to: { x: 3200, y: 3350 }, width: 180 }, // Hwy 417 / Queensway (east–west freeway)
+  { id: 'fifth', from: { x: 1400, y: 3800 }, to: { x: 2400, y: 3800 }, width: 140 }, // Fifth Ave through the Glebe
+  { id: 'carling', from: { x: 1200, y: 4600 }, to: { x: 2600, y: 4600 }, width: 160 }, // Carling Ave / Dow’s Lake belt
 
-  // Bridges (kept separate so they can render differently if needed)
+  // Bridges across the Ottawa River
   {
     id: 'bridge_macdonald_cartier',
     from: { x: 3000, y: 1500 },
     to: { x: 3000, y: 900 },
-    width: 130
+    width: 130,
   },
   {
     id: 'bridge_portage',
     from: { x: 1800, y: 1500 },
     to: { x: 1800, y: 900 },
-    width: 130
+    width: 130,
   },
   {
     id: 'bridge_chaudiere',
     from: { x: 1200, y: 1500 },
     to: { x: 1200, y: 900 },
-    width: 130
+    width: 130,
   },
   {
     id: 'bridge_champlain',
     from: { x: 500, y: 1600 },
     to: { x: 500, y: 900 },
-    width: 140
-  }
+    width: 140,
+  },
 ];
 
 // Road-label text per ID (kept separate from RoadSegment type)
@@ -382,10 +437,16 @@ export const ROAD_LABELS: Record<string, string> = {
   bank: 'BANK ST',
   sussex: 'SUSSEX DR',
   rideau: 'RIDEAU ST',
+  somerset: 'SOMERSET ST W',
+  gladstone: 'GLADSTONE AVE',
+  queensway: 'HWY 417 / QUEENSWAY',
+  fifth: 'FIFTH AVE',
+  carling: 'CARLING AVE',
+  preston: 'PRESTON ST',
   bridge_macdonald_cartier: 'MACDONALD-CARTIER BRIDGE',
   bridge_portage: 'PORTAGE BRIDGE',
   bridge_chaudiere: 'CHAUDIÈRE CROSSING',
-  bridge_champlain: 'CHAMPLAIN BRIDGE'
+  bridge_champlain: 'CHAMPLAIN BRIDGE',
 };
 
 export const CROSSWALKS: Crosswalk[] = [

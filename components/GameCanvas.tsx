@@ -4,8 +4,6 @@ import {
   CAN_IMAGE_URLS,
   GAME_WORLD_SIZE,
   CRITTER_ATLAS,
-  CRITTER_FPS_IDLE,
-  CRITTER_FPS_WALK,
   QUEBEC_BORDER_Y,
   SPEED_BOOST_DURATION,
   ROADS,
@@ -15,6 +13,14 @@ import {
   ROAD_LABELS,
   ROAD_SIGN_GREEN,
   ROAD_SIGN_GREEN_BORDER,
+  GROUND_TEXTURE_URL,
+  WATER_TILE_URL,
+  DETAIL_TEXTURE_URLS,
+  SPRITE_POLICE_CAR_URL,
+  SPRITE_RECYCLE_BIN_URL,
+  SPRITE_CHINATOWN_GATE_URL,
+  SPRITE_STASH_HOUSE_URL,
+  SPRITE_OC_TRANSPO_BUS_URL,
 } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
@@ -146,12 +152,24 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       (landmark) => Boolean(landmark.imageUrl),
     ).map((landmark) => landmark.imageUrl!);
 
+    const extraSpriteUrls = [
+      SPRITE_POLICE_CAR_URL,
+      SPRITE_RECYCLE_BIN_URL,
+      SPRITE_CHINATOWN_GATE_URL,
+      SPRITE_STASH_HOUSE_URL,
+      SPRITE_OC_TRANSPO_BUS_URL,
+    ];
+
     const imagesToLoad = Array.from(
       new Set([
         ...CAN_IMAGE_URLS,
         ...landmarkImageUrls,
+        ...extraSpriteUrls,
         CRITTER_ATLAS.image,
         ROAD_TEXTURE_URL,
+        GROUND_TEXTURE_URL,
+        WATER_TILE_URL,
+        ...DETAIL_TEXTURE_URLS,
       ]),
     );
     let loadedCount = 0;
@@ -264,7 +282,54 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     if (!ctx) return;
 
     const ensureGroundPattern = () => {
-      if (!patternCanvasRef.current) {
+      // Prefer real grass tile if available
+      const grassImg = loadedImages[GROUND_TEXTURE_URL];
+
+      if (grassImg) {
+        const existingCanvas = patternCanvasRef.current;
+        const needsNewCanvas =
+          !existingCanvas ||
+          !(existingCanvas as HTMLCanvasElement).dataset ||
+          (existingCanvas as HTMLCanvasElement).dataset['source'] !== 'grass';
+
+        if (needsNewCanvas) {
+          const patternCanvas = document.createElement('canvas');
+          // Use a fairly big tile so the pattern feels natural but still loops
+          patternCanvas.width = patternCanvas.height = 512;
+          const pctx = patternCanvas.getContext('2d');
+          if (pctx) {
+            pctx.imageSmoothingEnabled = false;
+
+            // Draw the grass texture to cover the tile
+            pctx.drawImage(
+              grassImg,
+              0,
+              0,
+              patternCanvas.width,
+              patternCanvas.height,
+            );
+
+            // Very subtle dark vignette toward corners to keep focus in the middle
+            const vignette = pctx.createRadialGradient(
+              256,
+              256,
+              0,
+              256,
+              256,
+              360,
+            );
+            vignette.addColorStop(0, 'rgba(0,0,0,0)');
+            vignette.addColorStop(1, 'rgba(0,0,0,0.14)');
+            pctx.fillStyle = vignette;
+            pctx.fillRect(0, 0, patternCanvas.width, patternCanvas.height);
+          }
+
+          (patternCanvas as HTMLCanvasElement).dataset['source'] = 'grass';
+          patternCanvasRef.current = patternCanvas;
+          groundPatternRef.current = null;
+        }
+      } else if (!patternCanvasRef.current) {
+        // Fallback: your original painted gradient, used only if tile not loaded yet
         const patternCanvas = document.createElement('canvas');
         patternCanvas.width = patternCanvas.height = 256;
         const pctx = patternCanvas.getContext('2d');
@@ -296,7 +361,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           }
         }
         patternCanvasRef.current = patternCanvas;
+        groundPatternRef.current = null;
       }
+
       if (patternCanvasRef.current && !groundPatternRef.current) {
         groundPatternRef.current = ctx.createPattern(
           patternCanvasRef.current,
@@ -348,7 +415,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         foliage,
         floatingTexts,
         clickMarkers,
-        critters,
         language,
         traffic,
         npcs,
@@ -449,7 +515,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const textMetrics = ctx.measureText(labelText);
         const textWidth = textMetrics.width;
         const paddingX = 6;
-        const paddingY = 3;
         const signWidth = textWidth + paddingX * 2;
         const signHeight = 18;
         const signX = midScreen.x - signWidth / 2;
@@ -718,12 +783,28 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fillText(e.emoji, x, y);
       });
 
-      // Depot + stash icons
+      // Depot + stash icons (use sprite for stash house)
       const depotScreenPos = worldToScreen(refundDepot, camera, canvasSize);
       ctx.font = '80px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
       ctx.fillText('🏪', depotScreenPos.x, depotScreenPos.y);
       const stashScreenPos = worldToScreen(stashHouse, camera, canvasSize);
-      ctx.fillText('📦', stashScreenPos.x, stashScreenPos.y);
+      const stashImg = loadedImages[SPRITE_STASH_HOUSE_URL];
+      if (stashImg) {
+        const targetWidth = 160;
+        const targetHeight = 120;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+          stashImg,
+          stashScreenPos.x - targetWidth / 2,
+          stashScreenPos.y - targetHeight,
+          targetWidth,
+          targetHeight,
+        );
+      } else {
+        ctx.fillText('📦', stashScreenPos.x, stashScreenPos.y);
+      }
 
       // Houses
       houses.forEach((h) => {
