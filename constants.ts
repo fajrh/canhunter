@@ -1,3 +1,4 @@
+// constants.ts
 import type {
   Zone,
   Upgrade,
@@ -97,7 +98,7 @@ export const WATER_TILE_URL =
 export const DETAIL_TEXTURE_URLS = [
   'https://opengameart.org/sites/default/files/flowers_5.png', // flowers patch
   'https://opengameart.org/sites/default/files/leaf1.png', // leaf litter
-  'https://opengameart.org/sites/default/files/shortgrass.png', // short grass clumps
+  'https://opengameart.org/sites/default/files/shortgrass.png' // short grass clumps
 ];
 
 // --- Custom Sprites (Ottawa-specific) ---
@@ -178,7 +179,7 @@ export const HOUSES: House[] = [
   ...createHouseCluster({ x: 3000, y: 1900 }, 9, 200)
 ];
 
-// --- Bridges ---
+// --- Bridges (world data) ---
 export const BRIDGES: Bridge[] = [
   // East to west across the river, roughly matching real order
   {
