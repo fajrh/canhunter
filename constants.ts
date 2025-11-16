@@ -15,8 +15,8 @@ import type {
 } from './types.ts';
 
 export const GAME_WORLD_SIZE = { width: 4000, height: 6000 };
-export const MAX_COLLECTIBLES = 1500;
-export const INITIAL_COLLECTIBLE_TARGET = 140;
+export const MAX_COLLECTIBLES = 300;
+export const INITIAL_COLLECTIBLE_TARGET = 28;
 
 // --- Helpers (seeded RNG + geometry) ---
 const mulberry32 = (seed: number) => {
@@ -98,24 +98,6 @@ export const ZONES: Zone[] = [
   { name: 'Chinatown', rect: [1000, 3000, 400, 800], spawnMultiplier: 1.1 }
 ];
 
-// Roughly following real geometry: canal from Dow's Lake to Parliament, etc.
-const RIDEAU_CANAL_POLY: Vector2[] = [
-  { x: 1400, y: 1200 },
-  { x: 1420, y: 1500 },
-  { x: 1380, y: 2000 },
-  { x: 1430, y: 2500 },
-  { x: 1480, y: 3500 },
-  { x: 1530, y: 4500 },
-  { x: 1550, y: 6000 },
-  { x: 1750, y: 6000 },
-  { x: 1730, y: 4500 },
-  { x: 1680, y: 3500 },
-  { x: 1630, y: 2500 },
-  { x: 1580, y: 2000 },
-  { x: 1620, y: 1500 },
-  { x: 1600, y: 1200 }
-];
-
 // Ottawa River strip at the north edge
 const OTTAWA_RIVER_POLY: Vector2[] = [
   { x: 0, y: 1100 },
@@ -125,7 +107,6 @@ const OTTAWA_RIVER_POLY: Vector2[] = [
 ];
 
 export const WATER_BODIES: WaterBody[] = [
-  { name: 'Rideau Canal', polygon: RIDEAU_CANAL_POLY },
   { name: 'Ottawa River', polygon: OTTAWA_RIVER_POLY }
 ];
 
