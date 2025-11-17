@@ -25,6 +25,7 @@ import {
   PLAYER_RUN_SPRITES,
   PLAYER_IDLE_SPRITES,
   REFUND_DEPOT_POSITION,
+  CELEBRATION_IMAGE_URLS,
 } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
@@ -188,6 +189,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ...DETAIL_TEXTURE_URLS,
       ]),
     );
+    CELEBRATION_IMAGE_URLS.forEach((url) => imagesToLoad.push(url));
     let loadedCount = 0;
     setLoadingProgress({ loaded: 0, total: imagesToLoad.length });
 
@@ -548,6 +550,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         houses,
         flyingCans,
         gameTime,
+        fireworks,
+        canRunStage,
+        outsideCityDirection,
       } = gameState;
 
       const dpr = devicePixelRatio;
@@ -1078,11 +1083,38 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.translate(playerScreenPos.x, playerScreenPos.y - 70);
           ctx.rotate(depotAngle - Math.PI / 2);
           ctx.globalAlpha = pulse;
-          ctx.font = 'bold 10px Arial';
+          ctx.font = 'bold 8px Arial';
           ctx.fillStyle = '#fff6aa';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('^', 0, 0);
+          ctx.restore();
+        }
+
+        if (outsideCityDirection) {
+          const angle = Math.atan2(outsideCityDirection.y, outsideCityDirection.x);
+          const pulse = 0.4 + 0.6 * Math.abs(Math.sin(gameTime * 0.008));
+          ctx.save();
+          ctx.translate(playerScreenPos.x, playerScreenPos.y - 86);
+          ctx.rotate(angle - Math.PI / 2);
+          ctx.globalAlpha = pulse;
+          ctx.font = 'bold 9px Arial';
+          ctx.fillStyle = '#9ee8ff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('^', 0, 0);
+          ctx.restore();
+        }
+
+        if (canRunStage) {
+          ctx.save();
+          ctx.translate(playerScreenPos.x, playerScreenPos.y - 92);
+          ctx.globalAlpha = 0.85;
+          ctx.font = '12px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#d6f5ff';
+          ctx.fillText('🚴', 0, 0);
           ctx.restore();
         }
       }
@@ -1096,15 +1128,32 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.save();
         ctx.translate(playerScreenPos.x, playerScreenPos.y - 60);
         ctx.rotate(angle + Math.PI / 2);
-        ctx.font = '14px sans-serif';
+        ctx.font = '10px sans-serif';
         ctx.fillStyle = 'rgba(255, 255, 0, 0.9)';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🔽', 0, 0);
-        ctx.font = 'bold 8pt Arial';
+        ctx.font = 'bold 7pt Arial';
         ctx.fillText(t('bridge_label', language), 0, 14);
         ctx.restore();
       }
+
+      fireworks.forEach((fw) => {
+        const { x, y } = worldToScreen(fw.position, camera, canvasSize);
+        const alpha = Math.max(0, fw.life);
+        const radius = fw.radius * (1.2 - fw.life * 0.1);
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        gradient.addColorStop(0, fw.color);
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
 
       // Floating texts
       floatingTexts.forEach((text) => {

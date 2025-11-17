@@ -65,6 +65,8 @@ import {
   RECYCLING_BIN_BONUS_ITEMS,
   RECYCLING_BIN_SPAWN_CHANCE,
   SPRITE_RECYCLE_BIN_URL,
+  CITY_BOUNDARY_PADDING,
+  CITY_CENTER,
 } from '../constants.ts';
 import { audioService } from '../services/audioService.ts';
 import { saveService } from '../services/saveService.ts';
@@ -102,6 +104,18 @@ const isPointOnBridge = (point: Vector2, bridges: Bridge[]): boolean =>
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const distance = (a: Vector2, b: Vector2) => Math.hypot(a.x - b.x, a.y - b.y);
+
+const CITY_BOUNDS = {
+  minX: -CITY_BOUNDARY_PADDING,
+  maxX: GAME_WORLD_SIZE.width + CITY_BOUNDARY_PADDING,
+  minY: -CITY_BOUNDARY_PADDING,
+  maxY: GAME_WORLD_SIZE.height + CITY_BOUNDARY_PADDING,
+};
+
+const clampToCityBounds = (position: Vector2): Vector2 => ({
+  x: Math.min(CITY_BOUNDS.maxX, Math.max(CITY_BOUNDS.minX, position.x)),
+  y: Math.min(CITY_BOUNDS.maxY, Math.max(CITY_BOUNDS.minY, position.y)),
+});
 
 const segmentCrossesWater = (start: Vector2, end: Vector2, bridges: Bridge[]): boolean => {
   const steps = Math.max(4, Math.ceil(distance(start, end) / 40), BRIDGE_PATH_SAMPLES);
@@ -502,6 +516,11 @@ export const useGameEngine = () => {
       closestBridge: null,
       isDepositing: false,
       sellCooldown: 0,
+      canRunStage: null,
+      canRunTimer: 0,
+      canRunRoute: [],
+      fireworks: [],
+      outsideCityDirection: null,
     };
 
     // Top up initial collectibles if save is empty / light
@@ -524,6 +543,11 @@ export const useGameEngine = () => {
       hasCollectedFirstCan: playerState.hasCollectedFirstCan,
       isInventoryFull: playerState.inventory.length >= playerState.inventoryCap,
       purchasedUpgrades: playerState.upgrades,
+      isPlayerNearDepot: false,
+      isPlayerNearStash: false,
+      isDepositing: false,
+      canRunStage: null,
+      outsideCityDirection: null,
     });
   }
 
@@ -613,8 +637,11 @@ export const useGameEngine = () => {
         }
       }
 
+      const canRunMultiplier = state.canRunStage ? 2.4 : 1;
       const activeSpeed =
-        player.speed * (player.speedBoostTimer > 0 ? SPEED_BOOST_MULTIPLIER : 1);
+        player.speed *
+        (player.speedBoostTimer > 0 ? SPEED_BOOST_MULTIPLIER : 1) *
+        canRunMultiplier;
       const prevPos = { ...player.position };
       const velocity = player.velocity;
 
@@ -670,6 +697,41 @@ export const useGameEngine = () => {
         velocity.y = 0;
       }
 
+      const boundedPosition = clampToCityBounds(player.position);
+      const wasClamped =
+        boundedPosition.x !== player.position.x || boundedPosition.y !== player.position.y;
+      const atEdge =
+        boundedPosition.x <= CITY_BOUNDS.minX + 1 ||
+        boundedPosition.x >= CITY_BOUNDS.maxX - 1 ||
+        boundedPosition.y <= CITY_BOUNDS.minY + 1 ||
+        boundedPosition.y >= CITY_BOUNDS.maxY - 1;
+      if (wasClamped) {
+        player.position = boundedPosition;
+        player.targetPosition = null;
+        player.pathQueue = [];
+        velocity.x = 0;
+        velocity.y = 0;
+      } else {
+        player.position = boundedPosition;
+      }
+      state.outsideCityDirection = atEdge
+        ? {
+            x: CITY_CENTER.x - boundedPosition.x,
+            y: CITY_CENTER.y - boundedPosition.y,
+          }
+        : null;
+
+      if (
+        state.canRunStage === 'riding_out' &&
+        !player.targetPosition &&
+        player.pathQueue.length === 0
+      ) {
+        player.position = { ...state.refundDepot };
+        velocity.x = 0;
+        velocity.y = 0;
+        state.canRunStage = 'depositing';
+      }
+
       // Pull next path node if we reached one
       if (!player.targetPosition && player.pathQueue.length > 0) {
         const next = player.pathQueue.shift();
@@ -694,6 +756,31 @@ export const useGameEngine = () => {
       // Camera follows player
       state.camera.x += (player.position.x - state.camera.x) * 0.2;
       state.camera.y += (player.position.y - state.camera.y) * 0.2;
+
+      if (
+        state.canRunStage === 'returning' &&
+        !player.targetPosition &&
+        player.pathQueue.length === 0
+      ) {
+        state.canRunStage = 'celebrating';
+        state.canRunTimer = 3.5;
+        state.flashMessageKey = 'flash_can_run_complete';
+        state.fireworks.push(
+          ...Array.from({ length: 8 }, () => ({
+            id: effectIdCounter.current++,
+            position: {
+              x: state.stashHouse.x + rand(-80, 80),
+              y: state.stashHouse.y + rand(-80, 80),
+            },
+            radius: rand(24, 48),
+            life: 1,
+            color: `hsl(${Math.floor(rand(0, 360))},85%,65%)`,
+          })),
+        );
+        player.position = { ...state.stashHouse };
+        player.velocity.x = 0;
+        player.velocity.y = 0;
+      }
 
       // HP & damage
       if (player.isInvulnerable) {
@@ -1001,6 +1088,32 @@ export const useGameEngine = () => {
         state.sellCooldown = 0;
       }
 
+      if (
+        state.canRunStage === 'depositing' &&
+        player.inventory.length === 0 &&
+        player.stash.length === 0 &&
+        !state.isDepositing
+      ) {
+        const returnPath = resolvePath(player.position, state.stashHouse, state.bridges);
+        if (returnPath && returnPath.length) {
+          const refinedReturn = refinePathSegments(player.position, returnPath);
+          if (refinedReturn.length) {
+            const [first, ...rest] = refinedReturn;
+            player.targetPosition = { ...first };
+            player.pathQueue = rest.map((n) => ({ ...n }));
+            player.velocity.x = 0;
+            player.velocity.y = 0;
+            state.canRunStage = 'returning';
+          } else {
+            state.canRunStage = 'celebrating';
+            state.canRunTimer = 3;
+          }
+        } else {
+          state.canRunStage = 'celebrating';
+          state.canRunTimer = 3;
+        }
+      }
+
       // Animate flying cans to depot
       state.flyingCans = state.flyingCans
         .map((can) => ({
@@ -1021,6 +1134,17 @@ export const useGameEngine = () => {
       state.clickMarkers = state.clickMarkers
         .map((m) => ({ ...m, life: m.life - (1 / 0.2) * deltaTime }))
         .filter((m) => m.life > 0);
+
+      state.fireworks = state.fireworks
+        .map((fw) => ({ ...fw, life: fw.life - deltaTime * 0.6 }))
+        .filter((fw) => fw.life > 0);
+
+      if (state.canRunStage === 'celebrating') {
+        state.canRunTimer -= deltaTime;
+        if (state.canRunTimer <= 0) {
+          state.canRunStage = null;
+        }
+      }
 
       animationFrameIdRef.current = requestAnimationFrame(gameLoop);
     },
@@ -1047,6 +1171,11 @@ export const useGameEngine = () => {
           hasCollectedFirstCan: state.player.hasCollectedFirstCan,
           isInventoryFull: state.player.inventory.length >= state.player.inventoryCap,
           purchasedUpgrades: state.player.upgrades,
+          isPlayerNearDepot: state.isPlayerNearDepot,
+          isPlayerNearStash: state.isPlayerNearStash,
+          isDepositing: state.isDepositing,
+          canRunStage: state.canRunStage,
+          outsideCityDirection: state.outsideCityDirection,
         });
         if (state.flashMessageKey) {
           if (flashMessageTimeoutRef.current)
@@ -1081,9 +1210,10 @@ export const useGameEngine = () => {
   const setTargetPosition = useCallback(
     (position: Vector2, isBridgeClick: boolean = false) => {
       const state = gameState.current;
-      if (!state) return;
+      if (!state || state.canRunStage) return;
 
-      const path = resolvePath(state.player.position, position, state.bridges);
+      const clamped = clampToCityBounds(position);
+      const path = resolvePath(state.player.position, clamped, state.bridges);
       if (!path || path.length === 0) {
         setToast('toast_need_bridge', 4000);
         return;
@@ -1132,6 +1262,31 @@ export const useGameEngine = () => {
     window.location.reload();
   };
 
+  const startCanRun = useCallback(() => {
+    const state = gameState.current;
+    if (!state || state.canRunStage) return;
+    const player = state.player;
+    if (!state.isPlayerNearStash || player.stash.length < player.stashCap) return;
+
+    const path = resolvePath(player.position, state.refundDepot, state.bridges);
+    if (!path || path.length === 0) {
+      setToast('toast_need_bridge', 4000);
+      return;
+    }
+
+    const refinedPath = refinePathSegments(player.position, path);
+    if (!refinedPath.length) return;
+    const [first, ...rest] = refinedPath;
+    player.targetPosition = { ...first };
+    player.pathQueue = rest.map((n) => ({ ...n }));
+    player.velocity.x = 0;
+    player.velocity.y = 0;
+    state.canRunStage = 'riding_out';
+    state.canRunTimer = 0;
+    state.canRunRoute = refinedPath;
+    state.flashMessageKey = 'flash_can_run';
+  }, [setToast]);
+
   const activateCrosswalk = () => {
     const state = gameState.current;
     const nearbyCrosswalk = state.crosswalks.find(
@@ -1156,5 +1311,6 @@ export const useGameEngine = () => {
     toastMessage,
     clearToast,
     activateCrosswalk,
+    startCanRun,
   };
 };

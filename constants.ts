@@ -16,6 +16,8 @@ import type {
 } from './types.ts';
 
 export const GAME_WORLD_SIZE = { width: 4000, height: 6000 };
+export const CITY_BOUNDARY_PADDING = 400;
+export const CITY_CENTER = { x: GAME_WORLD_SIZE.width / 2, y: GAME_WORLD_SIZE.height / 2 };
 export const MAX_COLLECTIBLES = 300;
 export const INITIAL_COLLECTIBLE_TARGET = 28;
 
@@ -128,6 +130,18 @@ export const PLAYER_IDLE_SPRITES = [
   'https://i.ibb.co/m53YwYdz/hood-idle3.png',
   'https://i.ibb.co/9kHx3sfp/hood-idle2.png',
   'https://i.ibb.co/dw3wgpPK/hood-idle1.png',
+];
+
+export const CELEBRATION_IMAGE_URLS = [
+  'https://i.ibb.co/6JJ4dRcq/task-01k9w5y6ddfjmawe54fjbfq38a-task-01k9w5y6ddfjmawe54fjbfq38a-genid-440fe822-e219-4215-a770-52b7a5.gif',
+  'https://i.ibb.co/fV47pJp2/task-01k9w5y6ddfjmawe54fjbfq38a-task-01k9w5y6ddfjmawe54fjbfq38a-genid-b474fb40-5d37-43c4-8f06-ada95f.gif',
+  'https://i.ibb.co/RkxKMdnc/task-01k9w5y6ddfjmawe54fjbfq38a-task-01k9w5y6ddfjmawe54fjbfq38a-genid-56ac020c-c5d2-4218-81a1-6eabcb.gif',
+  'https://i.ibb.co/Kg3hW5y/task-01k9w4zvxcew59b1hesb6n4rzd-task-01k9w4zvxcew59b1hesb6n4rzd-genid-32ec8e60-ff3c-4898-a1cd-ee9428.gif',
+  'https://i.ibb.co/Qvs2wShk/task-01k9w4zvxcew59b1hesb6n4rzd-task-01k9w4zvxcew59b1hesb6n4rzd-genid-ebafbb21-58ab-43ee-95cf-0cda5b.gif',
+  'https://i.ibb.co/wrRRc2CV/task-01k9w58vkeerct6nkxetprf3bh-task-01k9w58vkeerct6nkxetprf3bh-genid-1499b4d8-67d8-476e-8b40-0a55b8.gif',
+  'https://i.ibb.co/46qNydM/task-01k9w58vkeerct6nkxetprf3bh-task-01k9w58vkeerct6nkxetprf3bh-genid-6883c07d-7f32-43ce-8c93-faf74a.gif',
+  'https://i.ibb.co/s9DYV438/task-01k9w58vkeerct6nkxetprf3bh-task-01k9w58vkeerct6nkxetprf3bh-genid-ea7e2f39-a16d-4a7f-8dae-eb78f1.gif',
+  'https://i.ibb.co/SW89SjJ/task-01k9w58vkeerct6nkxetprf3bh-task-01k9w58vkeerct6nkxetprf3bh-genid-8f5bb1aa-2cd0-4abe-9b40-c17759.gif',
 ];
 
 // --- ZONES (Areas of Ottawa) ---

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import GameCanvas from './components/GameCanvas';
 import Hud from './components/Hud';
 import Controls from './components/Controls';
@@ -11,11 +11,15 @@ import HelpModal from './components/HelpModal';
 import { t } from './services/localization';
 import FlashMessage from './components/FlashMessage';
 import InventoryFullPrompt from './components/InventoryFullPrompt';
+import AmbientImages, { AmbientCard } from './components/AmbientImages';
+import { CELEBRATION_IMAGE_URLS } from './constants';
 
 export default function App() {
   const [isUpgradesOpen, setIsUpgradesOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(audioService.isMuted);
+  const [ambientCards, setAmbientCards] = useState<AmbientCard[]>([]);
+  const ambientIdRef = useRef(0);
 
   const {
     gameState,
@@ -26,7 +30,69 @@ export default function App() {
     toastMessage,
     clearToast,
     activateCrosswalk,
+    startCanRun,
   } = useGameEngine();
+
+  const queueAmbient = useCallback(
+    (durationMs: number, size: AmbientCard['size'] = 'sm') => {
+      const url =
+        CELEBRATION_IMAGE_URLS[
+          Math.floor(Math.random() * CELEBRATION_IMAGE_URLS.length)
+        ];
+      const id = ambientIdRef.current++;
+      const expiresAt = Date.now() + durationMs;
+      setAmbientCards((cards) => {
+        const now = Date.now();
+        const trimmed = cards.filter((c) => !c.expiresAt || c.expiresAt > now);
+        return [...trimmed.slice(-4), { id, url, size, expiresAt }];
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const cleanup = window.setInterval(() => {
+      const now = Date.now();
+      setAmbientCards((cards) => cards.filter((c) => !c.expiresAt || c.expiresAt > now));
+    }, 400);
+    return () => window.clearInterval(cleanup);
+  }, []);
+
+  useEffect(() => {
+    queueAmbient(4000, 'md');
+  }, [queueAmbient]);
+
+  const prevFullRef = useRef(false);
+  useEffect(() => {
+    if (uiState?.isInventoryFull && !prevFullRef.current) {
+      queueAmbient(2000, 'sm');
+    }
+    prevFullRef.current = !!uiState?.isInventoryFull;
+  }, [queueAmbient, uiState?.isInventoryFull]);
+
+  const depositIntervalRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (uiState?.isDepositing) {
+      queueAmbient(2000, 'sm');
+      if (depositIntervalRef.current) window.clearInterval(depositIntervalRef.current);
+      depositIntervalRef.current = window.setInterval(() => queueAmbient(2000, 'sm'), 2000);
+    } else if (depositIntervalRef.current) {
+      window.clearInterval(depositIntervalRef.current);
+      depositIntervalRef.current = null;
+    }
+  }, [queueAmbient, uiState?.isDepositing]);
+
+  useEffect(() => {
+    if (uiState?.canRunStage) {
+      queueAmbient(4000, 'md');
+      queueAmbient(4000, 'md');
+      const id = window.setInterval(() => {
+        queueAmbient(4000, 'md');
+        queueAmbient(4000, 'md');
+      }, 4000);
+      return () => window.clearInterval(id);
+    }
+  }, [queueAmbient, uiState?.canRunStage]);
 
   const handleToggleMute = () => {
     audioService.toggleMute();
@@ -65,6 +131,8 @@ export default function App() {
         language={uiState.language}
       />
 
+      <AmbientImages cards={ambientCards} />
+
       <GameCanvas
         gameStateRef={gameState}
         onSetTargetPosition={setTargetPosition}
@@ -82,6 +150,19 @@ export default function App() {
         stashCount={uiState.stashCount}
         stashCap={uiState.stashCap}
       />
+
+      {uiState.isPlayerNearStash &&
+        uiState.stashCount >= uiState.stashCap &&
+        !uiState.canRunStage && (
+          <div className="absolute bottom-28 left-1/2 -translate-x-1/2 pointer-events-auto">
+            <button
+              className="px-4 py-2 bg-blue-600 text-white rounded-full shadow-lg text-sm sm:text-base font-bold border border-white/30"
+              onClick={startCanRun}
+            >
+              🚴 {t('can_run_button', uiState.language)}
+            </button>
+          </div>
+        )}
 
       <Controls
         onUpgrades={() => setIsUpgradesOpen(true)}
