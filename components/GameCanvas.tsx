@@ -543,7 +543,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         language,
         traffic,
         npcs,
-        crosswalks,
         dialogue,
         closestBridge,
         collectibles,
@@ -774,11 +773,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         );
         ctx.restore();
       }
-
-      // Crosswalks (placeholder for later drawing)
-      crosswalks.forEach((_cw) => {
-        // draw crosswalk stripes later if desired
-      });
 
       // --- Foliage (under landmarks / cans) ---
       foliage.forEach((obj) => {

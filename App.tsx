@@ -29,7 +29,6 @@ export default function App() {
     resetSave,
     toastMessage,
     clearToast,
-    activateCrosswalk,
     startCanRun,
   } = useGameEngine();
 
@@ -170,7 +169,6 @@ export default function App() {
         onMute={handleToggleMute}
         isMuted={isMuted}
         language={uiState.language}
-        onCrosswalk={activateCrosswalk}
       />
 
       {isUpgradesOpen && (
