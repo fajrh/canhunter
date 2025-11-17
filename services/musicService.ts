@@ -1,19 +1,18 @@
-const YT_SCRIPT_ID = 'yt-iframe-api';
-const VIDEO_ID = 'p6J5A_Fl-pA';
-const BASE_VOLUME = 22;
+const SC_SCRIPT_ID = 'sc-widget-api';
+const PLAYER_ID = 'sc-music-player';
+const BASE_VOLUME = 18;
 
 class MusicService {
-  private player: any = null;
+  private widget: any = null;
   private apiReadyPromise: Promise<void> | null = null;
   private enabled: boolean = true;
-  private hasTriedStart: boolean = false;
   private hasEverPlayed: boolean = false;
 
   private ensureApiScript() {
-    if (document.getElementById(YT_SCRIPT_ID)) return;
+    if (document.getElementById(SC_SCRIPT_ID)) return;
     const tag = document.createElement('script');
-    tag.src = 'https://www.youtube.com/iframe_api';
-    tag.id = YT_SCRIPT_ID;
+    tag.src = 'https://w.soundcloud.com/player/api.js';
+    tag.id = SC_SCRIPT_ID;
     document.body.appendChild(tag);
   }
 
@@ -21,65 +20,60 @@ class MusicService {
     if (this.apiReadyPromise) return this.apiReadyPromise;
 
     this.apiReadyPromise = new Promise<void>((resolve) => {
-      const onApiReady = () => {
-        if (this.player) {
+      const setupWidget = () => {
+        if (this.widget) {
           resolve();
           return;
         }
 
-        this.player = new (window as any).YT.Player('yt-music-player', {
-          height: '0',
-          width: '0',
-          videoId: VIDEO_ID,
-          playerVars: {
-            autoplay: 1,
-            controls: 0,
-            disablekb: 1,
-            fs: 0,
-            loop: 1,
-            modestbranding: 1,
-            playsinline: 1,
-            rel: 0,
-            playlist: VIDEO_ID,
-          },
-          events: {
-            onReady: () => {
-              this.requestPlay(false);
-              resolve();
-            },
-            onStateChange: (event: any) => {
-              // Ensure looping on end
-              if (event.data === (window as any).YT.PlayerState.ENDED) {
-                this.player?.seekTo(0);
-                if (this.enabled) this.player?.playVideo();
-              }
+        const iframe = document.getElementById(
+          PLAYER_ID,
+        ) as HTMLIFrameElement | null;
 
-              if (event.data === (window as any).YT.PlayerState.PLAYING) {
-                this.hasTriedStart = true;
-                this.hasEverPlayed = true;
-              }
+        if (!iframe || !(window as any).SC?.Widget) {
+          resolve();
+          return;
+        }
 
-              if (
-                event.data === (window as any).YT.PlayerState.PAUSED &&
-                this.enabled
-              ) {
-                // Recover from autoplay blocks by retrying
-                this.requestPlay(true);
-              }
-            },
-          },
+        this.widget = (window as any).SC.Widget(iframe);
+
+        this.widget.bind((window as any).SC.Widget.Events.READY, () => {
+          this.requestPlay(false);
+          this.applyState();
+          resolve();
+        });
+
+        this.widget.bind((window as any).SC.Widget.Events.PLAY, () => {
+          this.hasEverPlayed = true;
+        });
+
+        this.widget.bind((window as any).SC.Widget.Events.PAUSE, () => {
+          if (this.enabled) {
+            this.requestPlay(true);
+          }
+        });
+
+        this.widget.bind((window as any).SC.Widget.Events.FINISH, () => {
+          try {
+            this.widget.seekTo(0);
+            if (this.enabled) {
+              this.widget.play();
+            }
+          } catch (err) {
+            console.warn('Background music loop failed:', err);
+          }
         });
       };
 
-      if ((window as any).YT && (window as any).YT.Player) {
-        onApiReady();
+      if ((window as any).SC && (window as any).SC.Widget) {
+        setupWidget();
       } else {
         this.ensureApiScript();
-        const previous = (window as any).onYouTubeIframeAPIReady;
-        (window as any).onYouTubeIframeAPIReady = () => {
-          previous?.();
-          onApiReady();
-        };
+        const script = document.getElementById(SC_SCRIPT_ID) as
+          | HTMLScriptElement
+          | null;
+
+        script?.addEventListener('load', () => setupWidget(), { once: true });
       }
     });
 
@@ -92,14 +86,14 @@ class MusicService {
   }
 
   private applyState() {
-    if (!this.player) return;
+    if (!this.widget) return;
 
     if (this.enabled) {
       this.requestPlay(true);
     } else {
       try {
-        this.player.pauseVideo();
-        this.player.mute();
+        this.widget.setVolume(0);
+        this.widget.pause();
       } catch (err) {
         console.warn('Background music pause failed:', err);
       }
@@ -115,16 +109,11 @@ class MusicService {
   }
 
   private requestPlay(unmute: boolean) {
-    if (!this.player) return;
+    if (!this.widget) return;
 
     try {
-      if (unmute) {
-        this.player.unMute();
-        this.player.setVolume(BASE_VOLUME);
-      } else {
-        this.player.mute();
-      }
-      this.player.playVideo();
+      this.widget.setVolume(unmute ? BASE_VOLUME : 0);
+      this.widget.play();
     } catch (err) {
       console.warn('Background music playback failed:', err);
     }

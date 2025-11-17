@@ -15,6 +15,9 @@ import AmbientImages, { AmbientCard } from './components/AmbientImages';
 import { CELEBRATION_IMAGE_URLS } from './constants';
 import { musicService } from './services/musicService';
 
+const SOUND_CLOUD_PLAYER_SRC =
+  'https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/2214038063&color=%23ff5500&auto_play=true&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=false&single_active=true';
+
 export default function App() {
   const [isUpgradesOpen, setIsUpgradesOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -210,7 +213,14 @@ export default function App() {
         language={uiState.language}
       />
 
-      <div id="yt-music-player" className="hidden" aria-hidden="true" />
+      <iframe
+        id="sc-music-player"
+        title="background-music"
+        className="hidden"
+        src={SOUND_CLOUD_PLAYER_SRC}
+        allow="autoplay"
+        aria-hidden="true"
+      />
     </div>
   );
 }
