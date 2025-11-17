@@ -29,7 +29,6 @@ export default function App() {
     resetSave,
     toastMessage,
     clearToast,
-    activateCrosswalk,
     startCanRun,
   } = useGameEngine();
 
@@ -59,13 +58,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    queueAmbient(4000, 'md');
+    queueAmbient(8000, 'md');
   }, [queueAmbient]);
 
   const prevFullRef = useRef(false);
   useEffect(() => {
     if (uiState?.isInventoryFull && !prevFullRef.current) {
-      queueAmbient(2000, 'sm');
+      queueAmbient(4000, 'sm');
     }
     prevFullRef.current = !!uiState?.isInventoryFull;
   }, [queueAmbient, uiState?.isInventoryFull]);
@@ -73,9 +72,9 @@ export default function App() {
   const depositIntervalRef = useRef<number | null>(null);
   useEffect(() => {
     if (uiState?.isDepositing) {
-      queueAmbient(2000, 'sm');
+      queueAmbient(4000, 'sm');
       if (depositIntervalRef.current) window.clearInterval(depositIntervalRef.current);
-      depositIntervalRef.current = window.setInterval(() => queueAmbient(2000, 'sm'), 2000);
+      depositIntervalRef.current = window.setInterval(() => queueAmbient(4000, 'sm'), 4000);
     } else if (depositIntervalRef.current) {
       window.clearInterval(depositIntervalRef.current);
       depositIntervalRef.current = null;
@@ -84,12 +83,10 @@ export default function App() {
 
   useEffect(() => {
     if (uiState?.canRunStage) {
-      queueAmbient(4000, 'md');
-      queueAmbient(4000, 'md');
+      queueAmbient(8000, 'md');
       const id = window.setInterval(() => {
-        queueAmbient(4000, 'md');
-        queueAmbient(4000, 'md');
-      }, 4000);
+        queueAmbient(8000, 'md');
+      }, 8000);
       return () => window.clearInterval(id);
     }
   }, [queueAmbient, uiState?.canRunStage]);
@@ -170,7 +167,6 @@ export default function App() {
         onMute={handleToggleMute}
         isMuted={isMuted}
         language={uiState.language}
-        onCrosswalk={activateCrosswalk}
       />
 
       {isUpgradesOpen && (

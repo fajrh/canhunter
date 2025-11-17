@@ -187,13 +187,6 @@ export interface NPC {
     dialogueCooldown: number;
 }
 
-export interface Crosswalk {
-    position: Vector2;
-    rect: [number, number, number, number];
-    active: boolean;
-    timer: number;
-}
-
 export type Language = 'en' | 'fr';
 
 export interface GameState {
@@ -222,7 +215,6 @@ export interface GameState {
   flashMessageKey: string | null;
   traffic: TrafficVehicle[];
   npcs: NPC[];
-  crosswalks: Crosswalk[];
   isWinter: boolean;
   dialogue: ChatBubble[];
   closestBridge: Bridge | null;
@@ -233,6 +225,9 @@ export interface GameState {
   canRunRoute: Vector2[];
   fireworks: Firework[];
   outsideCityDirection: Vector2 | null;
+  inventoryFullChimePlayed: boolean;
+  stashChimePlayed: boolean;
+  depotChimePlayed: boolean;
 }
 
 // Separate state for UI to avoid re-rendering the whole app on every frame

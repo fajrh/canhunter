@@ -11,7 +11,6 @@ import type {
   Vector2,
   Foliage,
   Quest,
-  Crosswalk,
   RoadSegment
 } from './types.ts';
 
@@ -547,11 +546,6 @@ export const ROAD_LABELS: Record<string, string> = {
   bridge_chaudiere: 'CHAUDIÈRE CROSSING',
   bridge_champlain: 'CHAMPLAIN BRIDGE'
 };
-
-export const CROSSWALKS: Crosswalk[] = [
-  { position: { x: 1850, y: 2500 }, rect: [1820, 2480, 60, 40], active: false, timer: 0 },
-  { position: { x: 2200, y: 2100 }, rect: [2170, 2080, 60, 40], active: false, timer: 0 }
-];
 
 // --- NPCs ---
 export const NPC_SPAWNS = [
