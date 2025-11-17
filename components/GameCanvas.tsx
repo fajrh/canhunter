@@ -1076,7 +1076,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           const glow = Math.abs(Math.sin(gameTime * 0.018));
           ctx.save();
           ctx.translate(playerScreenPos.x, playerScreenPos.y - 82);
-          ctx.rotate(depotAngle - Math.PI / 2);
+          ctx.rotate(depotAngle + Math.PI / 2);
           ctx.globalAlpha = pulse;
           ctx.font = 'bold 24px Arial';
           ctx.fillStyle = '#fff6aa';

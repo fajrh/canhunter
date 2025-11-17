@@ -84,9 +84,7 @@ export default function App() {
   useEffect(() => {
     if (uiState?.canRunStage) {
       queueAmbient(8000, 'md');
-      queueAmbient(8000, 'md');
       const id = window.setInterval(() => {
-        queueAmbient(8000, 'md');
         queueAmbient(8000, 'md');
       }, 8000);
       return () => window.clearInterval(id);
