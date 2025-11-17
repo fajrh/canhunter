@@ -49,7 +49,6 @@ import {
   NPC_SPAWNS,
   NPC_SHOVE_DAMAGE,
   CANAL_COLD_DAMAGE,
-  CROSSWALKS,
   BARKS_GENERAL,
   BARKS_POLICE,
   BARKS_QC,
@@ -510,7 +509,6 @@ export const useGameEngine = () => {
       flashMessageKey: null,
       traffic: Array.from({ length: 15 }, spawnTraffic),
       npcs: NPC_SPAWNS.map((n) => spawnNpc(n.type, n.pos)),
-      crosswalks: CROSSWALKS,
       isWinter: true,
       dialogue: [],
       closestBridge: null,
@@ -521,6 +519,9 @@ export const useGameEngine = () => {
       canRunRoute: [],
       fireworks: [],
       outsideCityDirection: null,
+      inventoryFullChimePlayed: false,
+      stashChimePlayed: false,
+      depotChimePlayed: false,
     };
 
     // Top up initial collectibles if save is empty / light
@@ -689,7 +690,7 @@ export const useGameEngine = () => {
         player.facing = 'left';
       }
 
-      if (isPointInWater(player.position) && !isPointOnBridge(player.position, state.bridges)) {
+      if (!state.canRunStage && isPointInWater(player.position) && !isPointOnBridge(player.position, state.bridges)) {
         player.position = prevPos;
         player.targetPosition = null;
         player.pathQueue = [];
@@ -877,13 +878,6 @@ export const useGameEngine = () => {
         }
       });
 
-      state.crosswalks.forEach((cw) => {
-        if (cw.active) {
-          cw.timer -= deltaTime;
-          if (cw.timer <= 0) cw.active = false;
-        }
-      });
-
       state.npcs.forEach((n) => {
         n.timer -= deltaTime;
         if (n.dialogueCooldown > 0) n.dialogueCooldown -= deltaTime;
@@ -1023,6 +1017,14 @@ export const useGameEngine = () => {
         }
       }
 
+      const isInventoryFull = player.inventory.length >= player.inventoryCap;
+      if (isInventoryFull && !state.inventoryFullChimePlayed) {
+        audioService.playMagicChime();
+        state.inventoryFullChimePlayed = true;
+      } else if (!isInventoryFull) {
+        state.inventoryFullChimePlayed = false;
+      }
+
       // --- Stash / Depot ---
       state.isPlayerNearStash =
         Math.hypot(
@@ -1030,11 +1032,35 @@ export const useGameEngine = () => {
           player.position.y - STASH_HOUSE_POSITION.y,
         ) < KIOSK_INTERACTION_RADIUS;
 
+      const canStashNow =
+        state.isPlayerNearStash &&
+        player.inventory.length > 0 &&
+        player.stash.length < player.stashCap;
+      if (canStashNow && !state.stashChimePlayed) {
+        audioService.playMagicChime();
+        state.stashChimePlayed = true;
+      } else if (!canStashNow) {
+        state.stashChimePlayed = false;
+      }
+
       if (state.isPlayerNearStash && player.inventory.length > 0) {
         const canMove = player.stashCap - player.stash.length;
         const toMove = player.inventory.splice(0, canMove);
         player.stash.push(...toMove);
-        if (toMove.length > 0) audioService.playSingleSellPop();
+        if (toMove.length > 0) {
+          audioService.playSingleSellPop();
+          toMove.forEach((can) => {
+            const id = state.flyingCanIdCounter++;
+            state.flyingCans.push({
+              id,
+              start: { ...player.position },
+              end: { ...STASH_HOUSE_POSITION },
+              progress: 0,
+              imageUrl: can.imageUrl,
+              emoji: can.emoji,
+            });
+          });
+        }
         if (player.inventory.length > 0) setToast('toast_stash_full');
       }
 
@@ -1043,6 +1069,15 @@ export const useGameEngine = () => {
           player.position.x - REFUND_DEPOT_POSITION.x,
           player.position.y - REFUND_DEPOT_POSITION.y,
         ) < KIOSK_INTERACTION_RADIUS;
+
+      const readyToDeposit =
+        state.isPlayerNearDepot && (player.inventory.length > 0 || player.stash.length > 0);
+      if (readyToDeposit && !state.depotChimePlayed) {
+        audioService.playMagicChime();
+        state.depotChimePlayed = true;
+      } else if (!readyToDeposit) {
+        state.depotChimePlayed = false;
+      }
 
       if (
         state.isPlayerNearDepot &&
@@ -1088,15 +1123,17 @@ export const useGameEngine = () => {
         state.sellCooldown = 0;
       }
 
-      if (
-        state.canRunStage === 'depositing' &&
-        player.inventory.length === 0 &&
-        player.stash.length === 0 &&
-        !state.isDepositing
-      ) {
-        const returnPath = resolvePath(player.position, state.stashHouse, state.bridges);
-        if (returnPath && returnPath.length) {
-          const refinedReturn = refinePathSegments(player.position, returnPath);
+        if (
+          state.canRunStage === 'depositing' &&
+          player.inventory.length === 0 &&
+          player.stash.length === 0 &&
+          !state.isDepositing
+        ) {
+          const returnPath = resolvePath(player.position, state.stashHouse, state.bridges);
+          const refinedReturn = returnPath?.length
+            ? refinePathSegments(player.position, returnPath)
+            : [{ ...state.stashHouse }];
+
           if (refinedReturn.length) {
             const [first, ...rest] = refinedReturn;
             player.targetPosition = { ...first };
@@ -1108,11 +1145,7 @@ export const useGameEngine = () => {
             state.canRunStage = 'celebrating';
             state.canRunTimer = 3;
           }
-        } else {
-          state.canRunStage = 'celebrating';
-          state.canRunTimer = 3;
         }
-      }
 
       // Animate flying cans to depot
       state.flyingCans = state.flyingCans
@@ -1269,14 +1302,13 @@ export const useGameEngine = () => {
     if (!state.isPlayerNearStash || player.stash.length < player.stashCap) return;
 
     const path = resolvePath(player.position, state.refundDepot, state.bridges);
-    if (!path || path.length === 0) {
-      setToast('toast_need_bridge', 4000);
-      return;
-    }
+    const refinedPath = path?.length
+      ? refinePathSegments(player.position, path)
+      : [{ ...state.refundDepot }];
+    const [first, ...rest] = refinedPath.length
+      ? refinedPath
+      : [{ ...state.refundDepot }, { ...state.refundDepot }];
 
-    const refinedPath = refinePathSegments(player.position, path);
-    if (!refinedPath.length) return;
-    const [first, ...rest] = refinedPath;
     player.targetPosition = { ...first };
     player.pathQueue = rest.map((n) => ({ ...n }));
     player.velocity.x = 0;
@@ -1285,22 +1317,8 @@ export const useGameEngine = () => {
     state.canRunTimer = 0;
     state.canRunRoute = refinedPath;
     state.flashMessageKey = 'flash_can_run';
-  }, [setToast]);
-
-  const activateCrosswalk = () => {
-    const state = gameState.current;
-    const nearbyCrosswalk = state.crosswalks.find(
-      (cw) =>
-        Math.hypot(
-          cw.position.x - state.player.position.x,
-          cw.position.y - state.player.position.y,
-        ) < 80,
-    );
-    if (nearbyCrosswalk) {
-      nearbyCrosswalk.active = true;
-      nearbyCrosswalk.timer = 5;
-    }
-  };
+    audioService.playMagicChime();
+  }, []);
 
   return {
     gameState,
@@ -1310,7 +1328,6 @@ export const useGameEngine = () => {
     resetSave,
     toastMessage,
     clearToast,
-    activateCrosswalk,
     startCanRun,
   };
 };
