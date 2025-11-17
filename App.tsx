@@ -13,11 +13,13 @@ import FlashMessage from './components/FlashMessage';
 import InventoryFullPrompt from './components/InventoryFullPrompt';
 import AmbientImages, { AmbientCard } from './components/AmbientImages';
 import { CELEBRATION_IMAGE_URLS } from './constants';
+import { musicService } from './services/musicService';
 
 export default function App() {
   const [isUpgradesOpen, setIsUpgradesOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(audioService.isMuted);
+  const [isMusicEnabled, setIsMusicEnabled] = useState(true);
   const [ambientCards, setAmbientCards] = useState<AmbientCard[]>([]);
   const ambientIdRef = useRef(0);
 
@@ -29,7 +31,6 @@ export default function App() {
     resetSave,
     toastMessage,
     clearToast,
-    activateCrosswalk,
     startCanRun,
   } = useGameEngine();
 
@@ -59,13 +60,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    queueAmbient(4000, 'md');
+    queueAmbient(8000, 'md');
   }, [queueAmbient]);
 
   const prevFullRef = useRef(false);
   useEffect(() => {
     if (uiState?.isInventoryFull && !prevFullRef.current) {
-      queueAmbient(2000, 'sm');
+      queueAmbient(4000, 'sm');
     }
     prevFullRef.current = !!uiState?.isInventoryFull;
   }, [queueAmbient, uiState?.isInventoryFull]);
@@ -73,9 +74,9 @@ export default function App() {
   const depositIntervalRef = useRef<number | null>(null);
   useEffect(() => {
     if (uiState?.isDepositing) {
-      queueAmbient(2000, 'sm');
+      queueAmbient(4000, 'sm');
       if (depositIntervalRef.current) window.clearInterval(depositIntervalRef.current);
-      depositIntervalRef.current = window.setInterval(() => queueAmbient(2000, 'sm'), 2000);
+      depositIntervalRef.current = window.setInterval(() => queueAmbient(4000, 'sm'), 4000);
     } else if (depositIntervalRef.current) {
       window.clearInterval(depositIntervalRef.current);
       depositIntervalRef.current = null;
@@ -84,12 +85,10 @@ export default function App() {
 
   useEffect(() => {
     if (uiState?.canRunStage) {
-      queueAmbient(4000, 'md');
-      queueAmbient(4000, 'md');
+      queueAmbient(8000, 'md');
       const id = window.setInterval(() => {
-        queueAmbient(4000, 'md');
-        queueAmbient(4000, 'md');
-      }, 4000);
+        queueAmbient(8000, 'md');
+      }, 8000);
       return () => window.clearInterval(id);
     }
   }, [queueAmbient, uiState?.canRunStage]);
@@ -98,6 +97,19 @@ export default function App() {
     audioService.toggleMute();
     setIsMuted(audioService.isMuted);
   };
+
+  const handleToggleMusic = () => {
+    setIsMusicEnabled((value) => !value);
+  };
+
+  useEffect(() => {
+    musicService.init();
+    musicService.kickstartOnInteraction(!isMuted && isMusicEnabled);
+  }, []);
+
+  useEffect(() => {
+    musicService.setEnabled(!isMuted && isMusicEnabled);
+  }, [isMuted, isMusicEnabled]);
 
   const handleReset = () => {
     if (window.confirm(t('reset_confirm', uiState.language))) {
@@ -169,8 +181,9 @@ export default function App() {
         onHelp={() => setIsHelpOpen(true)}
         onMute={handleToggleMute}
         isMuted={isMuted}
+        onToggleMusic={handleToggleMusic}
+        isMusicEnabled={isMusicEnabled}
         language={uiState.language}
-        onCrosswalk={activateCrosswalk}
       />
 
       {isUpgradesOpen && (
@@ -196,6 +209,8 @@ export default function App() {
         onDismiss={clearToast}
         language={uiState.language}
       />
+
+      <div id="yt-music-player" className="hidden" aria-hidden="true" />
     </div>
   );
 }
