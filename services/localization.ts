@@ -39,8 +39,9 @@ const translations: Record<string, Record<Language, string>> = {
   // Controls
   'upgrades_button': { en: 'Upgrades', fr: 'Amélios' },
   'toggle_mute': { en: 'Toggle Mute', fr: 'Activer/Désactiver le son' },
+  'enable_music': { en: 'Enable Music', fr: 'Activer la musique' },
+  'disable_music': { en: 'Disable Music', fr: 'Désactiver la musique' },
   'help_button': { en: 'Help', fr: 'Aide' },
-  'crosswalk_button': { en: 'Crosswalk', fr: 'Traverse' },
   
   // Upgrades Modal
   'upgrades_title': { en: 'Upgrades', fr: 'Améliorations' },
@@ -71,7 +72,7 @@ const translations: Record<string, Record<Language, string>> = {
   'help_goal_title': { en: 'Goal:', fr: 'Objectif :' },
   'help_goal_desc': { en: 'Collect cans in Ottawa, store them at your stash house (📦), then cross a bridge to Québec to sell them at the refund depot (🏪) for cash!', fr: 'Ramassez des canettes à Ottawa, stockez-les dans votre planque (📦), puis traversez un pont vers le Québec pour les vendre au dépôt de remboursement (🏪) contre de l\'argent !', },
   'help_controls_title': { en: 'Controls:', fr: 'Contrôles :' },
-  'help_controls_desc': { en: 'Click/tap to move. Use the 🚶 button to activate crosswalks near roads.', fr: 'Cliquez/appuyez pour vous déplacer. Utilisez le bouton 🚶 pour activer les traverses piétonnes près des routes.', },
+  'help_controls_desc': { en: 'Click/tap to move. Use the buttons to mute, open help, or visit upgrades.', fr: 'Cliquez/appuyez pour vous déplacer. Utilisez les boutons pour couper le son, ouvrir l’aide ou voir les améliorations.', },
   'help_hazards_title': { en: 'Hazards:', fr: 'Dangers :'},
   'help_hazards_desc': { en: 'Watch out for traffic and grumpy locals! Getting hit will lower your HP. If it reaches zero, you respawn.', fr: 'Attention à la circulation et aux habitants grincheux ! Être heurté diminuera vos PV. S\'ils atteignent zéro, vous réapparaissez.'},
   'help_rules_title': { en: 'The Rules:', fr: 'Les règles :'},

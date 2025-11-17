@@ -93,6 +93,13 @@ class AudioService {
     setTimeout(() => this.playTone(1200, 0.2, 'sine', 0.6), 300);
   }
 
+  playMagicChime() {
+    this.playTone(880, 0.08, 'triangle', 0.35);
+    setTimeout(() => this.playTone(1240, 0.08, 'sine', 0.4), 60);
+    setTimeout(() => this.playTone(1560, 0.1, 'triangle', 0.35), 140);
+    setTimeout(() => this.playTone(1960, 0.12, 'sine', 0.32), 210);
+  }
+
   playSingleSellPop() {
     this.playTone(1250, 0.05, 'triangle', 0.3);
   }
