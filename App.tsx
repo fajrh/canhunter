@@ -13,11 +13,13 @@ import FlashMessage from './components/FlashMessage';
 import InventoryFullPrompt from './components/InventoryFullPrompt';
 import AmbientImages, { AmbientCard } from './components/AmbientImages';
 import { CELEBRATION_IMAGE_URLS } from './constants';
+import { musicService } from './services/musicService';
 
 export default function App() {
   const [isUpgradesOpen, setIsUpgradesOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(audioService.isMuted);
+  const [isMusicEnabled, setIsMusicEnabled] = useState(true);
   const [ambientCards, setAmbientCards] = useState<AmbientCard[]>([]);
   const ambientIdRef = useRef(0);
 
@@ -96,6 +98,19 @@ export default function App() {
     setIsMuted(audioService.isMuted);
   };
 
+  const handleToggleMusic = () => {
+    setIsMusicEnabled((value) => !value);
+  };
+
+  useEffect(() => {
+    musicService.init();
+    musicService.kickstartOnInteraction(!isMuted && isMusicEnabled);
+  }, []);
+
+  useEffect(() => {
+    musicService.setEnabled(!isMuted && isMusicEnabled);
+  }, [isMuted, isMusicEnabled]);
+
   const handleReset = () => {
     if (window.confirm(t('reset_confirm', uiState.language))) {
       resetSave();
@@ -166,6 +181,8 @@ export default function App() {
         onHelp={() => setIsHelpOpen(true)}
         onMute={handleToggleMute}
         isMuted={isMuted}
+        onToggleMusic={handleToggleMusic}
+        isMusicEnabled={isMusicEnabled}
         language={uiState.language}
       />
 
@@ -192,6 +209,8 @@ export default function App() {
         onDismiss={clearToast}
         language={uiState.language}
       />
+
+      <div id="yt-music-player" className="hidden" aria-hidden="true" />
     </div>
   );
 }

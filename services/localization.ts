@@ -39,6 +39,8 @@ const translations: Record<string, Record<Language, string>> = {
   // Controls
   'upgrades_button': { en: 'Upgrades', fr: 'Amélios' },
   'toggle_mute': { en: 'Toggle Mute', fr: 'Activer/Désactiver le son' },
+  'enable_music': { en: 'Enable Music', fr: 'Activer la musique' },
+  'disable_music': { en: 'Disable Music', fr: 'Désactiver la musique' },
   'help_button': { en: 'Help', fr: 'Aide' },
   
   // Upgrades Modal

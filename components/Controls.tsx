@@ -7,16 +7,21 @@ interface ControlsProps {
   onHelp: () => void;
   onMute: () => void;
   isMuted: boolean;
+  onToggleMusic: () => void;
+  isMusicEnabled: boolean;
   language: Language;
 }
 
-const Controls: React.FC<ControlsProps> = ({ onUpgrades, onHelp, onMute, isMuted, language }) => {
+const Controls: React.FC<ControlsProps> = ({ onUpgrades, onHelp, onMute, isMuted, onToggleMusic, isMusicEnabled, language }) => {
   const buttonBaseClasses = "p-3 sm:p-4 rounded-full text-2xl sm:text-3xl transition-transform duration-200 active:scale-90 pointer-events-auto";
   const secondaryButtonClasses = `${buttonBaseClasses} bg-gray-700/80 text-white backdrop-blur-sm`;
 
   return (
     <div className="absolute bottom-0 left-0 right-0 p-4 flex justify-between items-end pointer-events-none">
       <div className="flex flex-col space-y-3">
+        <button onClick={onToggleMusic} className={secondaryButtonClasses} aria-label={t(isMusicEnabled ? 'disable_music' : 'enable_music', language)}>
+          {isMusicEnabled ? '🎵' : '🔕'}
+        </button>
          <button onClick={onMute} className={secondaryButtonClasses} aria-label={t('toggle_mute', language)}>
           {isMuted ? '🔇' : '🔊'}
         </button>
