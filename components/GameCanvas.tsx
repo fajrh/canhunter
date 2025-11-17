@@ -1078,15 +1078,21 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         );
 
         if (isInventoryFull) {
-          const pulse = 0.35 + 0.65 * Math.abs(Math.sin(gameTime * 0.01));
+          const pulse = 0.5 + 0.5 * Math.abs(Math.sin(gameTime * 0.012));
+          const glow = Math.abs(Math.sin(gameTime * 0.018));
           ctx.save();
-          ctx.translate(playerScreenPos.x, playerScreenPos.y - 70);
+          ctx.translate(playerScreenPos.x, playerScreenPos.y - 82);
           ctx.rotate(depotAngle - Math.PI / 2);
           ctx.globalAlpha = pulse;
-          ctx.font = 'bold 8px Arial';
+          ctx.font = 'bold 24px Arial';
           ctx.fillStyle = '#fff6aa';
+          ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+          ctx.lineWidth = 3;
+          ctx.shadowColor = glow > 0.5 ? '#ffe066' : '#b4f0ff';
+          ctx.shadowBlur = 18;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
+          ctx.strokeText('^', 0, 0);
           ctx.fillText('^', 0, 0);
           ctx.restore();
         }
