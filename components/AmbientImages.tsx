@@ -19,7 +19,7 @@ const AmbientImages: React.FC<AmbientImagesProps> = ({ cards }) => {
         <div
           key={card.id}
           className="rounded-lg overflow-hidden shadow-lg border border-white/40 bg-black/50 backdrop-blur-sm"
-          style={{ width: card.size === 'md' ? 160 : 120 }}
+          style={{ width: (card.size === 'md' ? 160 : 120) * 2.5 }}
         >
           <img
             src={card.url}
