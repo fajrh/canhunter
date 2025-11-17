@@ -16,6 +16,8 @@ import type {
 } from './types.ts';
 
 export const GAME_WORLD_SIZE = { width: 4000, height: 6000 };
+export const CITY_BOUNDARY_PADDING = 400;
+export const CITY_CENTER = { x: GAME_WORLD_SIZE.width / 2, y: GAME_WORLD_SIZE.height / 2 };
 export const MAX_COLLECTIBLES = 300;
 export const INITIAL_COLLECTIBLE_TARGET = 28;
 
@@ -113,6 +115,35 @@ export const SPRITE_STASH_HOUSE_URL =
 export const SPRITE_OC_TRANSPO_BUS_URL =
   'https://i.ibb.co/0yJHmfHB/bus.png';
 
+export const PLAYER_RUN_SPRITES = [
+  'https://i.ibb.co/wZDRxS10/hood-run-1.png',
+  'https://i.ibb.co/gZ3dDzs8/hood-run-2.png',
+  'https://i.ibb.co/zVCnCwGt/hood-run-3.png',
+  'https://i.ibb.co/CF6MrfW/hood-run-4.png',
+  'https://i.ibb.co/9m0KwB1K/hood-run-5.png',
+  'https://i.ibb.co/N6HLRk7K/hood-run-6.png',
+];
+
+export const PLAYER_IDLE_SPRITES = [
+  'https://i.ibb.co/dw3wgpPK/hood-idle1.png',
+  'https://i.ibb.co/9kHx3sfp/hood-idle2.png',
+  'https://i.ibb.co/m53YwYdz/hood-idle3.png',
+  'https://i.ibb.co/9kHx3sfp/hood-idle2.png',
+  'https://i.ibb.co/dw3wgpPK/hood-idle1.png',
+];
+
+export const CELEBRATION_IMAGE_URLS = [
+  'https://i.ibb.co/6JJ4dRcq/task-01k9w5y6ddfjmawe54fjbfq38a-task-01k9w5y6ddfjmawe54fjbfq38a-genid-440fe822-e219-4215-a770-52b7a5.gif',
+  'https://i.ibb.co/fV47pJp2/task-01k9w5y6ddfjmawe54fjbfq38a-task-01k9w5y6ddfjmawe54fjbfq38a-genid-b474fb40-5d37-43c4-8f06-ada95f.gif',
+  'https://i.ibb.co/RkxKMdnc/task-01k9w5y6ddfjmawe54fjbfq38a-task-01k9w5y6ddfjmawe54fjbfq38a-genid-56ac020c-c5d2-4218-81a1-6eabcb.gif',
+  'https://i.ibb.co/Kg3hW5y/task-01k9w4zvxcew59b1hesb6n4rzd-task-01k9w4zvxcew59b1hesb6n4rzd-genid-32ec8e60-ff3c-4898-a1cd-ee9428.gif',
+  'https://i.ibb.co/Qvs2wShk/task-01k9w4zvxcew59b1hesb6n4rzd-task-01k9w4zvxcew59b1hesb6n4rzd-genid-ebafbb21-58ab-43ee-95cf-0cda5b.gif',
+  'https://i.ibb.co/wrRRc2CV/task-01k9w58vkeerct6nkxetprf3bh-task-01k9w58vkeerct6nkxetprf3bh-genid-1499b4d8-67d8-476e-8b40-0a55b8.gif',
+  'https://i.ibb.co/46qNydM/task-01k9w58vkeerct6nkxetprf3bh-task-01k9w58vkeerct6nkxetprf3bh-genid-6883c07d-7f32-43ce-8c93-faf74a.gif',
+  'https://i.ibb.co/s9DYV438/task-01k9w58vkeerct6nkxetprf3bh-task-01k9w58vkeerct6nkxetprf3bh-genid-ea7e2f39-a16d-4a7f-8dae-eb78f1.gif',
+  'https://i.ibb.co/SW89SjJ/task-01k9w58vkeerct6nkxetprf3bh-task-01k9w58vkeerct6nkxetprf3bh-genid-8f5bb1aa-2cd0-4abe-9b40-c17759.gif',
+];
+
 // --- ZONES (Areas of Ottawa) ---
 export const ZONES: Zone[] = [
   { name: 'ByWard Market', rect: [2400, 1900, 500, 500], spawnMultiplier: 1.6 },
@@ -199,8 +230,7 @@ export const BRIDGES: Bridge[] = [
     nameKey: 'bridge_alexandra',
     from: { x: 2300, y: 1500 },
     to: { x: 2300, y: 900 },
-    rect: [2265, 1100, 70, 150],
-    repairGag: true
+    rect: [2265, 1100, 70, 150]
   },
   {
     name: 'Portage Bridge',
@@ -731,10 +761,47 @@ export const UPGRADES: Record<UpgradeId, Upgrade> = {
 };
 
 // --- Quests ---
+export const QUEST_ANYWHERE = 'Anywhere';
+
 export const QUESTS: Quest[] = [
-  { id: 1, descriptionKey: 'quest_1_desc', targetZone: null, targetCount: 20, reward: 10, progress: 0 },
-  { id: 2, descriptionKey: 'quest_2_desc', targetZone: 'ByWard Market', targetCount: 30, reward: 25, progress: 0 },
-  { id: 3, descriptionKey: 'quest_3_desc', targetZone: null, targetCount: 50, reward: 50, progress: 0 },
-  { id: 4, descriptionKey: 'quest_4_desc', targetZone: null, targetCount: 100, reward: 75, progress: 0 },
-  { id: 5, descriptionKey: 'quest_5_desc', targetZone: 'The Glebe', targetCount: 40, reward: 60, progress: 0 }
+  {
+    id: 1,
+    descriptionKey: 'quest_1_desc',
+    targetZone: QUEST_ANYWHERE,
+    targetCount: 20,
+    reward: 10,
+    progress: 0
+  },
+  {
+    id: 2,
+    descriptionKey: 'quest_2_desc',
+    targetZone: 'ByWard Market',
+    targetCount: 30,
+    reward: 25,
+    progress: 0
+  },
+  {
+    id: 3,
+    descriptionKey: 'quest_3_desc',
+    targetZone: QUEST_ANYWHERE,
+    targetCount: 50,
+    reward: 50,
+    progress: 0
+  },
+  {
+    id: 4,
+    descriptionKey: 'quest_4_desc',
+    targetZone: QUEST_ANYWHERE,
+    targetCount: 100,
+    reward: 75,
+    progress: 0
+  },
+  {
+    id: 5,
+    descriptionKey: 'quest_5_desc',
+    targetZone: 'The Glebe',
+    targetCount: 40,
+    reward: 60,
+    progress: 0
+  }
 ];

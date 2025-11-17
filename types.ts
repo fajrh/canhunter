@@ -3,6 +3,8 @@ export interface Vector2 {
   y: number;
 }
 
+export type CanRunStage = 'riding_out' | 'depositing' | 'returning' | 'celebrating' | null;
+
 export interface Zone {
   name: string;
   rect: [number, number, number, number];
@@ -39,7 +41,7 @@ export interface Upgrade {
 export interface Quest {
   id: number;
   descriptionKey: string;
-  targetZone: string | null;
+  targetZone: string;
   targetCount: number;
   reward: number;
   progress: number;
@@ -51,6 +53,7 @@ export interface PlayerState {
   pathQueue: Vector2[];
   speed: number;
   velocity: Vector2;
+  facing: 'left' | 'right';
   inventory: Collectible[];
   inventoryCap: number;
   money: number;
@@ -118,6 +121,14 @@ export interface FloatingText {
     position: Vector2;
     life: number; // starts at 1, goes to 0
     color: string;
+}
+
+export interface Firework {
+  id: number;
+  position: Vector2;
+  radius: number;
+  life: number;
+  color: string;
 }
 
 export interface ChatBubble {
@@ -215,6 +226,13 @@ export interface GameState {
   isWinter: boolean;
   dialogue: ChatBubble[];
   closestBridge: Bridge | null;
+  isDepositing: boolean;
+  sellCooldown: number;
+  canRunStage: CanRunStage;
+  canRunTimer: number;
+  canRunRoute: Vector2[];
+  fireworks: Firework[];
+  outsideCityDirection: Vector2 | null;
 }
 
 // Separate state for UI to avoid re-rendering the whole app on every frame
@@ -233,4 +251,9 @@ export interface UIState {
     hasCollectedFirstCan: boolean;
     isInventoryFull: boolean;
     purchasedUpgrades: Set<UpgradeId>;
+    isPlayerNearDepot: boolean;
+    isPlayerNearStash: boolean;
+    isDepositing: boolean;
+    canRunStage: CanRunStage;
+    outsideCityDirection: Vector2 | null;
 }

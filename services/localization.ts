@@ -18,6 +18,8 @@ const translations: Record<string, Record<Language, string>> = {
   'flash_welcome_quebec': { en: 'Welcome to Québec!', fr: 'Bienvenue au Québec !' },
   'flash_welcome_ontario': { en: 'Welcome to Ontario!', fr: 'Bienvenue en Ontario !' },
   'flash_o_train_ticker': { en: 'O-Train: Service interruption resolved (?)', fr: "O-Train : Interruption de service résolue (?)"},
+  'flash_can_run': { en: 'Can run started! Ride safe.', fr: 'Course de canettes lancée ! Roulez prudemment.' },
+  'flash_can_run_complete': { en: 'Can run complete! Great haul!', fr: 'Course de canettes terminée ! Super récolte !' },
 
   // Map Labels
   'quebec_label': { en: 'Québec', fr: 'Québec' },
@@ -32,6 +34,7 @@ const translations: Record<string, Record<Language, string>> = {
   'quest_4_desc': { en: 'Big spender! Earn a total of $100 to prove your skills.', fr: 'Grand dépensier ! Gagnez 100 $ pour prouver vos compétences.' },
   'quest_5_desc': { en: 'Glebe Gallivanter! Collect 40 items in The Glebe.', fr: 'Vadrouilleur du Glebe ! Ramassez 40 objets dans le Glebe.' },
   'hud_boost': { en: 'Boost', fr: 'Turbo' },
+  'can_run_button': { en: 'Can Run', fr: 'Course au dépôt' },
   
   // Controls
   'upgrades_button': { en: 'Upgrades', fr: 'Amélios' },
@@ -82,6 +85,7 @@ const translations: Record<string, Record<Language, string>> = {
   'toast_detour': { en: 'Detour! Alexandra Bridge is under repair.', fr: 'Détour ! Le pont Alexandra est en réparation.' },
   'toast_need_bridge': { en: 'Find a bridge to cross the river!', fr: 'Trouvez un pont pour traverser la rivière !' },
   'toast_stash_full': { en: 'Stash is full!', fr: 'La planque est pleine !' },
+  'toast_quest_complete': { en: 'Quest complete! Reward collected.', fr: 'Quête terminée ! Récompense obtenue.' },
 
   // Landmarks
   'landmark_parliament': { en: 'Parliament Hill', fr: 'Colline du Parlement' },

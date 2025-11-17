@@ -22,6 +22,10 @@ import {
   SPRITE_CHINATOWN_GATE_URL,
   SPRITE_STASH_HOUSE_URL,
   SPRITE_OC_TRANSPO_BUS_URL,
+  PLAYER_RUN_SPRITES,
+  PLAYER_IDLE_SPRITES,
+  REFUND_DEPOT_POSITION,
+  CELEBRATION_IMAGE_URLS,
 } from '../constants.ts';
 import { WaterFX } from '../services/waterfx.ts';
 import { t } from '../services/localization.ts';
@@ -137,6 +141,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   const groundPatternRef = useRef<CanvasPattern | null>(null);
   const roadPatternCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const roadPatternRef = useRef<CanvasPattern | null>(null);
+  const touchDirectionRef = useRef<Vector2 | null>(null);
+  const touchIntervalRef = useRef<number | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
 
   const [loadedImages, setLoadedImages] = useState<
     Record<string, HTMLImageElement>
@@ -146,6 +153,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     total: 1,
   });
   const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
+  const playerAnimRef = useRef<{ mode: 'idle' | 'run'; frameIndex: number }>(
+    {
+      mode: 'idle',
+      frameIndex: 0,
+    },
+  );
 
   // --- Asset loading (cans, critters, road tile, landmark images, extra sprites) ---
   useEffect(() => {
@@ -161,11 +174,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       SPRITE_OC_TRANSPO_BUS_URL,
     ];
 
+    const playerSpriteUrls = [...PLAYER_RUN_SPRITES, ...PLAYER_IDLE_SPRITES];
+
     const imagesToLoad = Array.from(
       new Set([
         ...CAN_IMAGE_URLS,
         ...landmarkImageUrls,
         ...extraSpriteUrls,
+        ...playerSpriteUrls,
         CRITTER_ATLAS.image,
         ROAD_TEXTURE_URL,
         GROUND_TEXTURE_URL,
@@ -173,6 +189,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ...DETAIL_TEXTURE_URLS,
       ]),
     );
+    CELEBRATION_IMAGE_URLS.forEach((url) => imagesToLoad.push(url));
     let loadedCount = 0;
     setLoadingProgress({ loaded: 0, total: imagesToLoad.length });
 
@@ -210,6 +227,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       };
     });
   }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const state = gameStateRef.current;
+      if (!state) return;
+
+      const { player } = state;
+      const speed = Math.hypot(player.velocity.x, player.velocity.y);
+      const nextMode: 'idle' | 'run' = speed > 8 ? 'run' : 'idle';
+      const anim = playerAnimRef.current;
+
+      if (anim.mode !== nextMode) {
+        anim.mode = nextMode;
+        anim.frameIndex = 0;
+        return;
+      }
+
+      const frameCount =
+        nextMode === 'run' ? PLAYER_RUN_SPRITES.length : PLAYER_IDLE_SPRITES.length;
+      anim.frameIndex = (anim.frameIndex + 1) % frameCount;
+    }, 120);
+
+    return () => window.clearInterval(interval);
+  }, [gameStateRef]);
 
   if (!waterFxRef.current) waterFxRef.current = new WaterFX(208, true);
 
@@ -266,14 +307,97 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     roadPatternRef.current = null;
   }, [canvasSize, devicePixelRatio]);
 
+  useEffect(() => () => stopTouchMovement(), []);
+
+  const updateTouchDirection = (worldPos: Vector2) => {
+    const { player } = gameStateRef.current;
+    const dx = worldPos.x - player.position.x;
+    const dy = worldPos.y - player.position.y;
+    const len = Math.hypot(dx, dy) || 1;
+    touchDirectionRef.current = { x: dx / len, y: dy / len };
+    const target = {
+      x: player.position.x + touchDirectionRef.current.x * 800,
+      y: player.position.y + touchDirectionRef.current.y * 800,
+    };
+    onSetTargetPosition(target);
+  };
+
+  const stopTouchMovement = () => {
+    if (touchIntervalRef.current) {
+      window.clearInterval(touchIntervalRef.current);
+      touchIntervalRef.current = null;
+    }
+    touchDirectionRef.current = null;
+    activePointerIdRef.current = null;
+    const state = gameStateRef.current;
+    if (state) {
+      state.player.targetPosition = null;
+      state.player.pathQueue = [];
+      state.player.velocity = { x: 0, y: 0 };
+    }
+  };
+
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const rect = canvasRef.current?.getBoundingClientRect();
     const x = e.clientX - (rect?.left ?? 0);
     const y = e.clientY - (rect?.top ?? 0);
-    onSetTargetPosition(
-      screenToWorld({ x, y }, gameStateRef.current.camera, canvasSize),
+    const worldPos = screenToWorld(
+      { x, y },
+      gameStateRef.current.camera,
+      canvasSize,
     );
+
+    if (e.pointerType === 'touch') {
+      activePointerIdRef.current = e.pointerId;
+      updateTouchDirection(worldPos);
+      if (canvasRef.current?.setPointerCapture) {
+        canvasRef.current.setPointerCapture(e.pointerId);
+      }
+      if (!touchIntervalRef.current) {
+        touchIntervalRef.current = window.setInterval(() => {
+          if (touchDirectionRef.current) {
+            const { player } = gameStateRef.current;
+            const target = {
+              x: player.position.x + touchDirectionRef.current.x * 800,
+              y: player.position.y + touchDirectionRef.current.y * 800,
+            };
+            onSetTargetPosition(target);
+          }
+        }, 80);
+      }
+    } else {
+      onSetTargetPosition(worldPos);
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType !== 'touch') return;
+    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current)
+      return;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const x = e.clientX - (rect?.left ?? 0);
+    const y = e.clientY - (rect?.top ?? 0);
+    const worldPos = screenToWorld(
+      { x, y },
+      gameStateRef.current.camera,
+      canvasSize,
+    );
+    updateTouchDirection(worldPos);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType !== 'touch') return;
+    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current)
+      return;
+    if (canvasRef.current?.releasePointerCapture) {
+      try {
+        canvasRef.current.releasePointerCapture(e.pointerId);
+      } catch (err) {
+        // ignore
+      }
+    }
+    stopTouchMovement();
   };
 
   useEffect(() => {
@@ -424,6 +548,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         closestBridge,
         collectibles,
         houses,
+        flyingCans,
+        gameTime,
+        fireworks,
+        canRunStage,
+        outsideCityDirection,
       } = gameState;
 
       const dpr = devicePixelRatio;
@@ -746,6 +875,43 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fillText(obj.emoji, x, y);
       });
 
+      // --- Flying cans headed to the depot ---
+      flyingCans.forEach((can) => {
+        const progress = Math.min(1, can.progress);
+        const currentPos = {
+          x: can.start.x + (can.end.x - can.start.x) * progress,
+          y: can.start.y + (can.end.y - can.start.y) * progress,
+        };
+        if (
+          currentPos.x < viewBounds.left ||
+          currentPos.x > viewBounds.right ||
+          currentPos.y < viewBounds.top ||
+          currentPos.y > viewBounds.bottom
+        ) {
+          return;
+        }
+        const { x, y } = worldToScreen(currentPos, camera, canvasSize);
+        const img = can.imageUrl ? loadedImages[can.imageUrl] : undefined;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        if (img) {
+          const drawHeight = 28;
+          const aspectRatio = img.width / img.height;
+          const drawWidth = drawHeight * aspectRatio;
+          ctx.drawImage(img, x - drawWidth / 2, y - drawHeight / 2, drawWidth, drawHeight);
+        } else if (can.emoji) {
+          ctx.font = '22px sans-serif';
+          ctx.fillText(can.emoji, x, y);
+        } else {
+          ctx.fillStyle = '#ffd166';
+          ctx.beginPath();
+          ctx.arc(x, y, 6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+
       // Path preview
       const pathTargets: Vector2[] = [];
       if (player.targetPosition) pathTargets.push(player.targetPosition);
@@ -829,6 +995,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         camera,
         canvasSize,
       );
+      const isInventoryFull = player.inventory.length >= player.inventoryCap;
+      const depotAngle = Math.atan2(
+        REFUND_DEPOT_POSITION.y - player.position.y,
+        REFUND_DEPOT_POSITION.x - player.position.x,
+      );
       if (player.speedBoostTimer > 0) {
         const boostRatio = Math.min(
           1,
@@ -851,14 +1022,46 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       if (player.isInvulnerable && Math.floor(time / 100) % 2 === 0) {
         // blink off
       } else {
-        ctx.font = '48px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(
-          player.upgrades.has('bicycle') ? '🚴' : '🧍',
-          playerScreenPos.x,
-          playerScreenPos.y,
-        );
+        const isRunning = Math.hypot(player.velocity.x, player.velocity.y) > 8;
+        const hasBicycle = player.upgrades.has('bicycle');
+        const nextMode: 'idle' | 'run' = isRunning ? 'run' : 'idle';
+        const anim = playerAnimRef.current;
+        if (anim.mode !== nextMode) {
+          anim.mode = nextMode;
+          anim.frameIndex = 0;
+        }
+        const spriteSet = nextMode === 'run' ? PLAYER_RUN_SPRITES : PLAYER_IDLE_SPRITES;
+        const spriteUrl = spriteSet[anim.frameIndex % spriteSet.length];
+        const spriteImg = loadedImages[spriteUrl];
+
+        if (spriteImg && !hasBicycle) {
+          const targetWidth = 48;
+          const targetHeight = 48;
+          const direction = player.facing === 'left' ? -1 : 1;
+          const previousSmoothing = ctx.imageSmoothingEnabled;
+          ctx.save();
+          ctx.translate(playerScreenPos.x, playerScreenPos.y);
+          ctx.scale(direction, 1);
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(
+            spriteImg,
+            -targetWidth / 2,
+            -targetHeight,
+            targetWidth,
+            targetHeight,
+          );
+          ctx.restore();
+          ctx.imageSmoothingEnabled = previousSmoothing;
+        } else {
+          ctx.font = '48px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(
+            hasBicycle ? '🚴' : '🧍',
+            playerScreenPos.x,
+            playerScreenPos.y,
+          );
+        }
         const hpBarWidth = 40;
         const hpBarHeight = 5;
         const hpBarX = playerScreenPos.x - hpBarWidth / 2;
@@ -873,6 +1076,47 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           hpBarWidth * (player.hp / player.maxHp),
           hpBarHeight,
         );
+
+        if (isInventoryFull) {
+          const pulse = 0.35 + 0.65 * Math.abs(Math.sin(gameTime * 0.01));
+          ctx.save();
+          ctx.translate(playerScreenPos.x, playerScreenPos.y - 70);
+          ctx.rotate(depotAngle - Math.PI / 2);
+          ctx.globalAlpha = pulse;
+          ctx.font = 'bold 8px Arial';
+          ctx.fillStyle = '#fff6aa';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('^', 0, 0);
+          ctx.restore();
+        }
+
+        if (outsideCityDirection) {
+          const angle = Math.atan2(outsideCityDirection.y, outsideCityDirection.x);
+          const pulse = 0.4 + 0.6 * Math.abs(Math.sin(gameTime * 0.008));
+          ctx.save();
+          ctx.translate(playerScreenPos.x, playerScreenPos.y - 86);
+          ctx.rotate(angle - Math.PI / 2);
+          ctx.globalAlpha = pulse;
+          ctx.font = 'bold 9px Arial';
+          ctx.fillStyle = '#9ee8ff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('^', 0, 0);
+          ctx.restore();
+        }
+
+        if (canRunStage) {
+          ctx.save();
+          ctx.translate(playerScreenPos.x, playerScreenPos.y - 92);
+          ctx.globalAlpha = 0.85;
+          ctx.font = '12px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#d6f5ff';
+          ctx.fillText('🚴', 0, 0);
+          ctx.restore();
+        }
       }
 
       // Bridge direction hint arrow above player
@@ -884,15 +1128,32 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.save();
         ctx.translate(playerScreenPos.x, playerScreenPos.y - 60);
         ctx.rotate(angle + Math.PI / 2);
-        ctx.font = '24px sans-serif';
+        ctx.font = '10px sans-serif';
         ctx.fillStyle = 'rgba(255, 255, 0, 0.9)';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🔽', 0, 0);
-        ctx.font = 'bold 10pt Arial';
-        ctx.fillText(t('bridge_label', language), 0, 20);
+        ctx.font = 'bold 7pt Arial';
+        ctx.fillText(t('bridge_label', language), 0, 14);
         ctx.restore();
       }
+
+      fireworks.forEach((fw) => {
+        const { x, y } = worldToScreen(fw.position, camera, canvasSize);
+        const alpha = Math.max(0, fw.life);
+        const radius = fw.radius * (1.2 - fw.life * 0.1);
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        gradient.addColorStop(0, fw.color);
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
 
       // Floating texts
       floatingTexts.forEach((text) => {
@@ -952,6 +1213,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         height={canvasSize.height}
         className="absolute top-0 left-0 w-full h-full cursor-pointer"
         onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={handlePointerUp}
       />
       {!allAssetsLoaded && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-1/2 max-w-sm pointer-events-none">
